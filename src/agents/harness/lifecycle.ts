@@ -217,6 +217,9 @@ function emitAgentHarnessRunError(params: {
 export async function runAgentHarnessLifecycleAttempt(
   harness: AgentHarness,
   params: AgentHarnessAttemptParams,
+  executeAttempt: (
+    params: AgentHarnessAttemptParams,
+  ) => Promise<AgentHarnessAttemptResult> = harness.runAttempt.bind(harness),
 ): Promise<AgentHarnessAttemptResult> {
   let result: AgentHarnessAttemptResult;
   let phase: AgentHarnessLifecyclePhase = "prepare";
@@ -263,7 +266,7 @@ export async function runAgentHarnessLifecycleAttempt(
     }
     const runAndClassify = async () => {
       phase = "send";
-      const rawResult = await harness.runAttempt(params);
+      const rawResult = await executeAttempt(params);
       phase = "resolve";
       // Classification happens inside the diagnostic phase so failures identify
       // whether they came from send or result resolution.

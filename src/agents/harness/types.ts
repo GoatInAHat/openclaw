@@ -110,6 +110,8 @@ type AgentHarnessRunCapability = {
   deliveryDefaults?: AgentHarnessDeliveryDefaults;
   supports(ctx: AgentHarnessSupportContext): AgentHarnessSupport;
   runAttempt(params: AgentHarnessAttemptParams): Promise<AgentHarnessAttemptResult>;
+  /** Runs a transport-bound realtime voice session without synthesizing a text turn. */
+  runRealtimeVoiceSession?(params: AgentHarnessAttemptParams): Promise<AgentHarnessAttemptResult>;
 };
 
 type AgentHarnessSideQuestionCapability = {

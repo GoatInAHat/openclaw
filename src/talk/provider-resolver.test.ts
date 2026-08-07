@@ -62,6 +62,37 @@ describe("realtime voice provider resolver", () => {
     });
   });
 
+  it("selects bound-session providers only when the host verifies a binding", () => {
+    const boundOnly: RealtimeVoiceProviderPlugin = {
+      id: "bound-only",
+      label: "Bound only",
+      capabilities: {
+        transports: ["provider-websocket"],
+        inputAudioFormats: [],
+        outputAudioFormats: [],
+        requiresBoundAgentSession: true,
+      },
+      isConfigured: () => true,
+      createBridge: () => {
+        throw new Error("unused");
+      },
+    };
+
+    expect(() =>
+      resolveConfiguredRealtimeVoiceProvider({
+        configuredProviderId: boundOnly.id,
+        providers: [boundOnly],
+      }),
+    ).toThrow('Realtime voice provider "bound-only" is not configured');
+    expect(
+      resolveConfiguredRealtimeVoiceProvider({
+        configuredProviderId: boundOnly.id,
+        providers: [boundOnly],
+        boundAgentSession: true,
+      }).provider,
+    ).toBe(boundOnly);
+  });
+
   it("keeps explicit provider model over the default model", () => {
     const resolution = resolveConfiguredRealtimeVoiceProvider({
       cfg: {},

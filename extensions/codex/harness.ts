@@ -80,6 +80,14 @@ export function createCodexAppServerAgentHarness(options: {
         nativeHookRelay: { enabled: true },
       });
     },
+    runRealtimeVoiceSession: async (params) => {
+      const { runCodexAppServerAttempt } = await import("./src/app-server/run-attempt.js");
+      return runCodexAppServerAttempt(params, {
+        bindingStore: options.bindingStore,
+        pluginConfig: options?.resolvePluginConfig?.() ?? options?.pluginConfig,
+        nativeHookRelay: { enabled: true },
+      });
+    },
     runSideQuestion: async (params) => {
       const { runCodexAppServerSideQuestion } = await import("./src/app-server/side-question.js");
       return runCodexAppServerSideQuestion(params, {

@@ -330,7 +330,16 @@ export async function runAgentHarnessAttempt(
     sessionKey: params.sessionKey,
     agentId: params.agentId,
   });
-  const runAttempt = () => runAgentHarnessLifecycleAttempt(harness, attemptParams);
+  const runAttempt = () => {
+    if (attemptParams.realtimeVoice) {
+      const runRealtimeVoiceSession = harness.runRealtimeVoiceSession?.bind(harness);
+      if (!runRealtimeVoiceSession) {
+        throw new Error(`Agent harness ${harness.id} does not support realtime voice sessions.`);
+      }
+      return runAgentHarnessLifecycleAttempt(harness, attemptParams, runRealtimeVoiceSession);
+    }
+    return runAgentHarnessLifecycleAttempt(harness, attemptParams);
+  };
   if (harness.id === "openclaw") {
     return await runWithDiagnosticTraceContext(harnessTrace, runAttempt);
   }

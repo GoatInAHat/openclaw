@@ -2354,6 +2354,84 @@ describe("DiscordVoiceManager", () => {
     expect(realtimeSessionMock.submitToolResult).toHaveBeenCalledTimes(1);
   });
 
+  it("binds a direct-agent provider and denies non-owner audio", async () => {
+    resolveConfiguredRealtimeVoiceProviderMock.mockReturnValue({
+      provider: {
+        id: "codex",
+        capabilities: {
+          transports: ["provider-websocket"],
+          inputAudioFormats: [],
+          outputAudioFormats: [],
+          supportsToolCalls: false,
+          handlesAgentTurns: true,
+        },
+      },
+      providerConfig: { model: "codex", voice: "verse" },
+    } as never);
+    const manager = createManager({
+      groupPolicy: "open",
+      voice: {
+        enabled: true,
+        mode: "agent-proxy",
+        realtime: { provider: "codex" },
+      },
+    });
+    const onUtterance = vi.fn();
+
+    await manager.join({ guildId: "g1", channelId: "1001" });
+    await manager.join(
+      { guildId: "g1", channelId: "1001" },
+      { transcripts: { sessionId: "notes-1", onUtterance } },
+    );
+    const bridgeParams = lastRealtimeBridgeParams() as unknown as {
+      agentId?: string;
+      sessionKey?: string;
+      senderIsOwner?: boolean;
+      autoRespondToAudio?: boolean;
+      tools?: unknown[];
+      onTranscript?: (role: "user" | "assistant", text: string, isFinal: boolean) => void;
+    };
+    expect(bridgeParams.agentId).toBe("agent-1");
+    expect(bridgeParams.sessionKey).toBe("discord:g1:c1");
+    expect(bridgeParams.senderIsOwner).toBe(true);
+    expect(bridgeParams.autoRespondToAudio).toBe(true);
+    expect(bridgeParams.tools).toEqual([]);
+
+    const entry = (manager as unknown as { sessions: Map<string, unknown> }).sessions.get("g1") as
+      | {
+          realtime?: {
+            beginSpeakerTurn: (
+              context: { extraSystemPrompt?: string; senderIsOwner: boolean; speakerLabel: string },
+              userId: string,
+            ) => { close: () => void; sendInputAudio: (audio: Buffer) => void };
+          };
+        }
+      | undefined;
+    const ownerTurn = entry?.realtime?.beginSpeakerTurn(
+      { extraSystemPrompt: undefined, senderIsOwner: true, speakerLabel: "Owner" },
+      "u-owner",
+    );
+    ownerTurn?.sendInputAudio(Buffer.alloc(8));
+    expect(realtimeSessionMock.sendAudio).toHaveBeenCalledOnce();
+    bridgeParams.onTranscript?.("user", "native owner transcript", true);
+    await vi.waitFor(() =>
+      expect(onUtterance).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sessionId: "notes-1",
+          speaker: { id: "u-owner", label: "Owner" },
+          text: "native owner transcript",
+        }),
+      ),
+    );
+    const guestTurn = entry?.realtime?.beginSpeakerTurn(
+      { extraSystemPrompt: undefined, senderIsOwner: false, speakerLabel: "Guest" },
+      "u-guest",
+    );
+    guestTurn?.sendInputAudio(Buffer.alloc(8));
+    expect(realtimeSessionMock.sendAudio).toHaveBeenCalledOnce();
+    expect(agentCommandMock).not.toHaveBeenCalled();
+  });
+
   it("handles semantic realtime agent-control tool calls in Discord VC", async () => {
     controlRealtimeVoiceAgentRunMock.mockResolvedValueOnce({
       ok: true,

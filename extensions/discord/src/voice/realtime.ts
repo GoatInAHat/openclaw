@@ -24,6 +24,7 @@ import {
   REALTIME_VOICE_AUDIO_FORMAT_PCM16_24KHZ,
   parseRealtimeVoiceAgentControlToolArgs,
   resolveConfiguredRealtimeVoiceProvider,
+  resolveRealtimeVoiceProviderCapabilities,
   resolveRealtimeVoiceAgentConsultToolPolicy,
   resolveRealtimeVoiceAgentConsultTools,
   resolveRealtimeVoiceAgentConsultToolsAllow,
@@ -388,6 +389,7 @@ export class DiscordRealtimeVoiceSession implements VoiceRealtimeSession {
   private outputPlaybackWatchdog: ReturnType<typeof setTimeout> | undefined;
   private outputPacedBuffer: Buffer = Buffer.alloc(0);
   private realtimeProviderId: string | undefined;
+  private providerHandlesAgentTurns = false;
   private queuedExactSpeechMessages: string[] = [];
   private exactSpeechResponseActive = false;
   private exactSpeechAudioStarted = false;
@@ -457,9 +459,14 @@ export class DiscordRealtimeVoiceSession implements VoiceRealtimeSession {
       providerConfigOverrides: buildProviderConfigOverrides(this.realtimeConfig),
       cfg: this.params.cfg,
       defaultModel: this.realtimeConfig?.model,
+      boundAgentSession: true,
       noRegisteredProviderMessage: "No configured realtime voice provider registered",
     });
     this.realtimeProviderId = resolved.provider.id;
+    const providerHandlesAgentTurns =
+      resolveRealtimeVoiceProviderCapabilities({ provider: resolved.provider })
+        ?.handlesAgentTurns === true;
+    this.providerHandlesAgentTurns = providerHandlesAgentTurns;
     const isAgentProxy = isDiscordAgentProxyVoiceMode(this.params.mode);
     const defaultToolPolicy: RealtimeVoiceAgentConsultToolPolicy = isAgentProxy
       ? "owner"
@@ -482,9 +489,11 @@ export class DiscordRealtimeVoiceSession implements VoiceRealtimeSession {
           agentId: this.params.entry.route.agentId,
         })
       : [];
-    const usesRealtimeAgentHandoff = this.params.mode === "bidi" || toolPolicy !== "none";
+    const usesRealtimeAgentHandoff =
+      !providerHandlesAgentTurns && (this.params.mode === "bidi" || toolPolicy !== "none");
     const autoRespondToAudio =
-      !this.requireWakeName && (!isAgentProxy || consultPolicy !== "always");
+      providerHandlesAgentTurns ||
+      (!this.requireWakeName && (!isAgentProxy || consultPolicy !== "always"));
     const interruptResponseOnInputAudio =
       !this.requireWakeName &&
       resolveDiscordRealtimeInterruptResponseOnInputAudio({
@@ -497,10 +506,14 @@ export class DiscordRealtimeVoiceSession implements VoiceRealtimeSession {
       bootstrapContextInstructions: this.params.bootstrapContextInstructions,
       toolPolicy,
       consultPolicy,
+      providerHandlesAgentTurns,
     });
     this.bridge = createRealtimeVoiceBridgeSession({
       provider: resolved.provider,
       cfg: this.params.cfg,
+      agentId: this.params.entry.route.agentId,
+      sessionKey: this.params.entry.route.sessionKey,
+      ...(providerHandlesAgentTurns ? { senderIsOwner: true } : {}),
       providerConfig: resolved.providerConfig,
       audioFormat: REALTIME_VOICE_AUDIO_FORMAT_PCM16_24KHZ,
       instructions,
@@ -525,6 +538,12 @@ export class DiscordRealtimeVoiceSession implements VoiceRealtimeSession {
           this.suppressDuplicateControlSpeech(text);
         }
         if (role !== "user") {
+          return;
+        }
+        if (providerHandlesAgentTurns) {
+          if (isFinal) {
+            this.recordDirectAgentTranscript(text);
+          }
           return;
         }
         if (!isFinal) {
@@ -602,6 +621,7 @@ export class DiscordRealtimeVoiceSession implements VoiceRealtimeSession {
     this.bridge?.close();
     this.bridge = null;
     this.realtimeProviderId = undefined;
+    this.providerHandlesAgentTurns = false;
     const voiceSdk = loadDiscordVoiceSdk();
     this.params.entry.player.off(voiceSdk.AudioPlayerStatus.Idle, this.playerIdleHandler);
   }
@@ -631,6 +651,12 @@ export class DiscordRealtimeVoiceSession implements VoiceRealtimeSession {
   }
 
   beginSpeakerTurn(context: VoiceRealtimeSpeakerContext, userId: string): VoiceRealtimeSpeakerTurn {
+    if (this.providerHandlesAgentTurns && !context.senderIsOwner) {
+      logger.warn(
+        `discord voice: direct-agent audio denied guild=${this.params.entry.guildId} channel=${this.params.entry.channelId} user=${userId} speaker=${context.speakerLabel}`,
+      );
+      return { sendInputAudio: () => undefined, close: () => undefined };
+    }
     this.resetPartialWakeNameTracking();
     const turn = this.speakerTurns.open(
       { ...context, userId },
@@ -1373,6 +1399,18 @@ export class DiscordRealtimeVoiceSession implements VoiceRealtimeSession {
     return turn ? { context: turn.context, startedAt: turn.startedAt } : undefined;
   }
 
+  private recordDirectAgentTranscript(text: string): void {
+    const trimmed = text.trim();
+    if (!trimmed) {
+      return;
+    }
+    const turn = this.peekPendingSpeakerTurn();
+    this.recordTranscriptUtterance(trimmed, this.transcriptAttributionFromTurn(turn));
+    if (turn) {
+      this.consumePendingSpeakerContext();
+    }
+  }
+
   private recordTranscriptUtterance(
     text: string,
     attribution: TranscriptUtteranceAttribution | undefined,
@@ -1732,6 +1770,7 @@ function buildDiscordRealtimeInstructions(params: {
   bootstrapContextInstructions?: string;
   toolPolicy: RealtimeVoiceAgentConsultToolPolicy;
   consultPolicy: "auto" | "always";
+  providerHandlesAgentTurns?: boolean;
 }): string {
   const base =
     params.instructions ??
@@ -1739,6 +1778,9 @@ function buildDiscordRealtimeInstructions(params: {
       "You are OpenClaw's Discord voice interface.",
       "Keep spoken replies concise, natural, and suitable for a live Discord voice channel.",
     ].join("\n");
+  if (params.providerHandlesAgentTurns) {
+    return base;
+  }
   if (isDiscordAgentProxyVoiceMode(params.mode)) {
     return [
       base,

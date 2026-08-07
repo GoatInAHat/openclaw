@@ -2191,6 +2191,7 @@ async function runEmbeddedAgentInternal(
             contextWindowInfo: ctxInfo,
             skillsSnapshot: params.skillsSnapshot,
             prompt,
+            realtimeVoice: params.realtimeVoice,
             transcriptPrompt: params.transcriptPrompt,
             userTurnTranscriptRecorder: params.userTurnTranscriptRecorder,
             currentInboundEventKind: params.currentInboundEventKind,

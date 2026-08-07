@@ -20,6 +20,10 @@ import type { CommandQueueEnqueueFn } from "../../../process/command-queue.types
 import type { InputProvenance } from "../../../sessions/input-provenance.js";
 import type { UserTurnTranscriptRecorder } from "../../../sessions/user-turn-transcript.types.js";
 import type { SkillSnapshot } from "../../../skills/types.js";
+import type {
+  RealtimeVoiceBridge,
+  RealtimeVoiceBridgeCreateRequest,
+} from "../../../talk/provider-types.js";
 import type { ExecElevatedDefaults, ExecToolDefaults } from "../../bash-tools.exec-types.js";
 import type { BootstrapContextRunKind } from "../../bootstrap-mode.js";
 import type { AgentStreamParams, ClientToolDefinition } from "../../command/shared-types.js";
@@ -152,6 +156,11 @@ export type RunEmbeddedAgentParams = {
   config?: OpenClawConfig;
   skillsSnapshot?: SkillSnapshot;
   prompt: string;
+  /** Host-owned realtime bridge request prepared through the normal bound agent lifecycle. */
+  realtimeVoice?: {
+    request: RealtimeVoiceBridgeCreateRequest;
+    onBridgeReady: (bridge: RealtimeVoiceBridge) => void;
+  };
   /** User-visible prompt body to submit and persist; runtime context travels separately. */
   transcriptPrompt?: string;
   currentInboundEventKind?: InboundEventKind;

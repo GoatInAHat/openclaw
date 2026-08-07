@@ -224,6 +224,11 @@ import {
 } from "./protocol.js";
 import { resolveCodexProviderWebSearchSupport } from "./provider-capabilities.js";
 import { readCodexRateLimitsRevision, readRecentCodexRateLimits } from "./rate-limit-cache.js";
+import {
+  assertCodexRealtimeVoiceAudioFormat,
+  buildRealtimeVoiceAttemptResult,
+  CodexAppServerRealtimeVoiceBridge,
+} from "./realtime-voice-session.js";
 import { releaseCodexSandboxExecServerEnvironment } from "./sandbox-exec-server.js";
 import {
   isCodexAppServerNativeAuthProfile,
@@ -1782,6 +1787,7 @@ export async function runCodexAppServerAttempt(
   const steeringQueueRef: {
     current?: ReturnType<typeof createCodexSteeringQueue>;
   } = {};
+  const realtimeBridgeRef: { current?: CodexAppServerRealtimeVoiceBridge } = {};
 
   const renewNativeHookRelayForTurnProgress = () => {
     if (!nativeHookRelay || options.nativeHookRelay?.ttlMs !== undefined) {
@@ -2090,6 +2096,10 @@ export async function runCodexAppServerAttempt(
     });
 
   const handleNotification = async (notification: CodexServerNotification) => {
+    if (realtimeBridgeRef.current) {
+      realtimeBridgeRef.current.handleNotification(notification);
+      return;
+    }
     const projector = projectorRef.current;
     const turnId = turnIdRef.current;
     const userInputBridge = userInputBridgeRef.current;
@@ -2255,6 +2265,9 @@ export async function runCodexAppServerAttempt(
     scope: CodexThreadRouteScope,
     receivedAtMs: number,
   ) => {
+    if (realtimeBridgeRef.current) {
+      return;
+    }
     const projector = projectorRef.current;
     const turnId = turnIdRef.current;
     if (!projector || !turnId) {
@@ -2323,12 +2336,25 @@ export async function runCodexAppServerAttempt(
     request: CodexAppServerServerRequest,
     scope: CodexThreadRouteScope,
   ) => {
-    const turnId = turnIdRef.current;
+    if (realtimeBridgeRef.current && scope.turnId && scope.turnId !== turnIdRef.current) {
+      userInputBridgeRef.current?.cancelPending();
+      turnIdRef.current = scope.turnId;
+      userInputBridgeRef.current = createCodexUserInputBridge({
+        paramsForRun: params,
+        threadId: thread.threadId,
+        turnId: scope.turnId,
+        signal: runAbortController.signal,
+      });
+    }
+    const turnId = realtimeBridgeRef.current ? scope.turnId : turnIdRef.current;
     const userInputBridge = userInputBridgeRef.current;
     const projector = projectorRef.current;
     let armCompletionWatchOnResponse = false;
     let requestCountsAsTurnActivity = false;
     const markCurrentTurnRequestProgress = () => {
+      if (realtimeBridgeRef.current) {
+        return;
+      }
       activeAppServerTurnRequests += 1;
       turnWatches.clearCompletionIdleTimer();
       turnWatches.disarmAssistantCompletionIdleWatch();
@@ -2552,6 +2578,9 @@ export async function runCodexAppServerAttempt(
           });
         }
         pendingOpenClawDynamicToolCompletionIds.delete(call.callId);
+        if (realtimeBridgeRef.current) {
+          return protocolResponse as JsonValue;
+        }
         if (response.terminate === true) {
           scheduleTurnReleaseAfterTerminalDynamicTool({
             call,
@@ -2608,7 +2637,7 @@ export async function runCodexAppServerAttempt(
           turnWatches.armCompletionIdleWatch({ timeoutMs: postToolContinuationTimeoutMs });
         }
         scheduleTerminalDynamicToolReleaseCheck();
-      } else {
+      } else if (!realtimeBridgeRef.current) {
         turnWatches.scheduleProgressWatches();
       }
     }
@@ -2679,6 +2708,43 @@ export async function runCodexAppServerAttempt(
     releaseSharedClientLeaseOnce();
     params.abortSignal?.removeEventListener("abort", abortFromUpstream);
     throw error;
+  }
+
+  if (params.realtimeVoice) {
+    const realtimeVoice = params.realtimeVoice;
+    assertCodexRealtimeVoiceAudioFormat(realtimeVoice.request);
+    const bridge = new CodexAppServerRealtimeVoiceBridge(
+      client,
+      thread.threadId,
+      realtimeVoice.request,
+      runAbortController.signal,
+    );
+    realtimeBridgeRef.current = bridge;
+    const onRealtimeAbort = () => bridge.close();
+    runAbortController.signal.addEventListener("abort", onRealtimeAbort, { once: true });
+    try {
+      realtimeVoice.onBridgeReady(bridge);
+      await bridge.completion.promise;
+      return buildRealtimeVoiceAttemptResult({ attempt: params, systemPromptReport });
+    } finally {
+      runAbortController.signal.removeEventListener("abort", onRealtimeAbort);
+      bridge.close();
+      realtimeBridgeRef.current = undefined;
+      userInputBridgeRef.current?.cancelPending();
+      turnWatches.clearAllTimers();
+      if (!runAbortController.signal.aborted) {
+        await unsubscribeCodexThreadBestEffort(client, {
+          threadId: thread.threadId,
+          timeoutMs: CODEX_APP_SERVER_UNSUBSCRIBE_TIMEOUT_MS,
+        });
+      }
+      releaseCurrentRoute();
+      nativeHookRelay?.unregister();
+      await releaseSandboxExecEnvironment();
+      await releaseSharedClientLeaseAndRetireOneShotClient();
+      params.abortSignal?.removeEventListener("abort", abortFromUpstream);
+      await trajectoryRecorder?.flush();
+    }
   }
 
   const buildLlmInputEvent = () => ({

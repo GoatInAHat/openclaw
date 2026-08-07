@@ -9,6 +9,7 @@ import { definePluginEntry } from "openclaw/plugin-sdk/plugin-entry";
 import { createCodexAppServerAgentHarness } from "./harness.js";
 import { buildCodexMediaUnderstandingProvider } from "./media-understanding-provider.js";
 import { buildCodexProvider } from "./provider.js";
+import { buildCodexRealtimeVoiceProvider } from "./realtime-voice-provider.js";
 import {
   CODEX_APP_SERVER_BINDING_MAX_ENTRIES,
   CODEX_APP_SERVER_BINDING_NAMESPACE,
@@ -70,6 +71,7 @@ export default definePluginEntry({
       }),
     );
     api.registerProvider(buildCodexProvider({ pluginConfig: api.pluginConfig }));
+    api.registerRealtimeVoiceProvider(buildCodexRealtimeVoiceProvider({ runtime: api.runtime }));
     api.registerMediaUnderstandingProvider(
       buildCodexMediaUnderstandingProvider({ pluginConfig: api.pluginConfig }),
     );

@@ -4,6 +4,7 @@
   "description": "OpenClaw Codex app-server harness and model provider plugin with a Codex-managed GPT catalog.",
   "providers": ["codex"],
   "contracts": {
+    "realtimeVoiceProviders": ["codex"],
     "mediaUnderstandingProviders": ["codex"],
     "migrationProviders": ["codex"],
     "tools": ["codex_threads"],

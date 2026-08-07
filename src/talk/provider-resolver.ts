@@ -29,8 +29,17 @@ export type ResolveConfiguredRealtimeVoiceProviderParams = {
   providers?: RealtimeVoiceProviderPlugin[];
   /** Model injected before provider-specific resolveConfig runs. */
   defaultModel?: string;
+  /** The host has resolved and authorized a canonical agent session for this launch. */
+  boundAgentSession?: boolean;
   noRegisteredProviderMessage?: string;
 };
+
+/** Provider capabilities used by the bridge surface. */
+export function resolveRealtimeVoiceProviderCapabilities(params: {
+  provider: RealtimeVoiceProviderPlugin;
+}): RealtimeVoiceProviderPlugin["capabilities"] {
+  return params.provider.capabilities;
+}
 
 /** Resolve the configured realtime voice provider or auto-select the first configured one. */
 export function resolveConfiguredRealtimeVoiceProvider(
@@ -66,7 +75,9 @@ export function resolveConfiguredRealtimeVoiceProvider(
       );
     },
     isProviderConfigured: ({ provider, cfg, providerConfig }) =>
-      provider.isConfigured({ cfg, providerConfig }),
+      provider.capabilities?.requiresBoundAgentSession && !params.boundAgentSession
+        ? false
+        : provider.isConfigured({ cfg, providerConfig }),
   });
 
   if (!resolution.ok && resolution.code === "missing-configured-provider") {
