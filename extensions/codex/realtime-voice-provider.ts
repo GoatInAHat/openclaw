@@ -290,7 +290,7 @@ export function buildCodexRealtimeVoiceProvider(options: {
 }): RealtimeVoiceProviderPlugin {
   return {
     id: "codex",
-    label: "Codex Realtime V3",
+    label: "Codex Realtime",
     aliases: ["codex-realtime"],
     autoSelectOrder: 40,
     capabilities: {
@@ -315,6 +315,9 @@ export function buildCodexRealtimeVoiceProvider(options: {
         : {}),
       ...(normalizeOptionalString(rawConfig.voice)
         ? { voice: normalizeOptionalString(rawConfig.voice) }
+        : {}),
+      ...(normalizeOptionalString(rawConfig.version)
+        ? { version: normalizeOptionalString(rawConfig.version) }
         : {}),
     }),
     isConfigured: ({ cfg }) => hasOpenAIPlatformApiKey(cfg),
