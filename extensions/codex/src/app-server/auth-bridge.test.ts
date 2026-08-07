@@ -421,7 +421,7 @@ describe("bridgeCodexAppServerStartOptions", () => {
           agentDir,
         }),
       ).rejects.toThrow(
-        "Codex realtime v2 requires an explicitly selected OpenAI Platform API key",
+        "Codex realtime requires an explicitly selected OpenAI Platform API key",
       );
     } finally {
       await fs.rm(agentDir, { recursive: true, force: true });

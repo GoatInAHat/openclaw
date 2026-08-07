@@ -100,7 +100,7 @@ export async function bridgeCodexAppServerStartOptions(params: {
 
 function assertSelectedRealtimeOpenAiApiKey(startOptions: CodexAppServerStartOptions): void {
   if (!startOptions.env?.[OPENAI_API_KEY_ENV_VAR]?.trim()) {
-    throw new Error("Codex realtime v2 requires an explicitly selected OpenAI Platform API key");
+    throw new Error("Codex realtime requires an explicitly selected OpenAI Platform API key");
   }
 }
 
