@@ -138,9 +138,9 @@ describe("Codex app-server config", () => {
         },
       },
     });
-    expect(enableCodexRealtimeConversation(websocket, { version: "v2", apiKey: "unused" })).toBe(
-      websocket,
-    );
+    expect(() =>
+      enableCodexRealtimeConversation(websocket, { version: "v2", apiKey: "unused" }),
+    ).toThrow("Codex realtime requires app-server.transport=stdio");
   });
 
   it("only auto-approves app-server approvals for full yolo runtime policy", () => {
