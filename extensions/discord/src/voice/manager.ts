@@ -419,6 +419,7 @@ export class DiscordVoiceManager {
     params: { guildId: string; channelId: string },
     options?: {
       preserveFollowState?: boolean;
+      requester?: { senderId: string; senderIsOwner: boolean };
       transcripts?: VoiceSessionEntry["transcripts"];
     },
   ): Promise<VoiceOperationResult> {
@@ -484,6 +485,7 @@ export class DiscordVoiceManager {
     params: { guildId: string; channelId: string },
     options?: {
       preserveFollowState?: boolean;
+      requester?: { senderId: string; senderIsOwner: boolean };
       transcripts?: VoiceSessionEntry["transcripts"];
     },
   ): Promise<VoiceOperationResult> {
@@ -499,6 +501,7 @@ export class DiscordVoiceManager {
       if (!options?.transcripts && isDiscordRealtimeVoiceMode(voiceMode) && !existing.realtime) {
         const realtimeResult = await this.attachRealtimeSession(existing, voiceMode, {
           requireLiveEntry: true,
+          requester: options?.requester,
         });
         if (!realtimeResult.ok) {
           return {
@@ -747,7 +750,9 @@ export class DiscordVoiceManager {
     };
 
     if (!options?.transcripts && isDiscordRealtimeVoiceMode(voiceMode)) {
-      const realtimeResult = await this.attachRealtimeSession(entry, voiceMode);
+      const realtimeResult = await this.attachRealtimeSession(entry, voiceMode, {
+        requester: options?.requester,
+      });
       if (!realtimeResult.ok) {
         destroyVoiceConnectionSafely({
           connection,
@@ -853,7 +858,10 @@ export class DiscordVoiceManager {
   private async attachRealtimeSession(
     entry: VoiceSessionEntry,
     voiceMode: Exclude<DiscordVoiceMode, "stt-tts">,
-    options?: { requireLiveEntry?: boolean },
+    options?: {
+      requireLiveEntry?: boolean;
+      requester?: { senderId: string; senderIsOwner: boolean };
+    },
   ): Promise<{ ok: true } | { ok: false; message: string }> {
     const bootstrapContextInstructions = await resolveDiscordVoiceRealtimeBootstrapContext({
       entry,
@@ -875,6 +883,7 @@ export class DiscordVoiceManager {
       discordConfig: this.params.discordConfig,
       entry,
       mode: voiceMode,
+      requester: options?.requester,
       runAgentTurn: ({ context, message, toolsAllow, userId }) =>
         this.runDiscordRealtimeAgentTurn({ context, entry, message, toolsAllow, userId }),
     });

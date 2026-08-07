@@ -722,6 +722,27 @@ export function resolveCodexAppServerRuntimeOptions(
   };
 }
 
+export function enableCodexRealtimeConversation(
+  appServer: CodexAppServerRuntimeOptions,
+): CodexAppServerRuntimeOptions {
+  if (appServer.start.transport !== "stdio") {
+    return appServer;
+  }
+  const args = appServer.start.args;
+  for (let index = 0; index < args.length - 1; index += 1) {
+    if (args[index] === "--enable" && args[index + 1] === "realtime_conversation") {
+      return appServer;
+    }
+  }
+  return {
+    ...appServer,
+    start: {
+      ...appServer.start,
+      args: [...args, "--enable", "realtime_conversation"],
+    },
+  };
+}
+
 export function isCodexAppServerApprovalPolicyAllowedByRequirements(
   policy: CodexAppServerApprovalPolicy,
   params: {

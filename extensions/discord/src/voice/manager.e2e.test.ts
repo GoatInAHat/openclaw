@@ -2378,7 +2378,10 @@ describe("DiscordVoiceManager", () => {
     });
     const onUtterance = vi.fn();
 
-    await manager.join({ guildId: "g1", channelId: "1001" });
+    await manager.join(
+      { guildId: "g1", channelId: "1001" },
+      { requester: { senderId: "u-owner", senderIsOwner: true } },
+    );
     await manager.join(
       { guildId: "g1", channelId: "1001" },
       { transcripts: { sessionId: "notes-1", onUtterance } },
@@ -2386,6 +2389,7 @@ describe("DiscordVoiceManager", () => {
     const bridgeParams = lastRealtimeBridgeParams() as unknown as {
       agentId?: string;
       sessionKey?: string;
+      senderId?: string;
       senderIsOwner?: boolean;
       autoRespondToAudio?: boolean;
       tools?: unknown[];
@@ -2393,6 +2397,7 @@ describe("DiscordVoiceManager", () => {
     };
     expect(bridgeParams.agentId).toBe("agent-1");
     expect(bridgeParams.sessionKey).toBe("discord:g1:c1");
+    expect(bridgeParams.senderId).toBe("u-owner");
     expect(bridgeParams.senderIsOwner).toBe(true);
     expect(bridgeParams.autoRespondToAudio).toBe(true);
     expect(bridgeParams.tools).toEqual([]);
@@ -2428,6 +2433,12 @@ describe("DiscordVoiceManager", () => {
       "u-guest",
     );
     guestTurn?.sendInputAudio(Buffer.alloc(8));
+    expect(realtimeSessionMock.sendAudio).toHaveBeenCalledOnce();
+    const otherOwnerTurn = entry?.realtime?.beginSpeakerTurn(
+      { extraSystemPrompt: undefined, senderIsOwner: true, speakerLabel: "Other Owner" },
+      "u-other-owner",
+    );
+    otherOwnerTurn?.sendInputAudio(Buffer.alloc(8));
     expect(realtimeSessionMock.sendAudio).toHaveBeenCalledOnce();
     expect(agentCommandMock).not.toHaveBeenCalled();
   });
