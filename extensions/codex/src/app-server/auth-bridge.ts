@@ -85,6 +85,9 @@ export async function bridgeCodexAppServerStartOptions(params: {
     authProfileId,
     config: params.config,
   });
+  if (shouldClearInheritedOpenAiApiKey && params.startOptions.requiresRealtimeOpenAiApiKeyEnv) {
+    assertSelectedRealtimeOpenAiApiKey(scopedStartOptions);
+  }
   return shouldClearInheritedOpenAiApiKey
     ? withClearedEnvironmentVariables(
         scopedStartOptions,
@@ -93,6 +96,12 @@ export async function bridgeCodexAppServerStartOptions(params: {
           : CODEX_APP_SERVER_API_KEY_ENV_VARS,
       )
     : scopedStartOptions;
+}
+
+function assertSelectedRealtimeOpenAiApiKey(startOptions: CodexAppServerStartOptions): void {
+  if (!startOptions.env?.[OPENAI_API_KEY_ENV_VAR]?.trim()) {
+    throw new Error("Codex realtime v2 requires an explicitly selected OpenAI Platform API key");
+  }
 }
 
 export function resolveCodexAppServerAuthProfileId(params: {

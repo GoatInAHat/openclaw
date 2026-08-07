@@ -563,7 +563,10 @@ export async function runCodexAppServerAttempt(
     openClawSandboxActive: sandbox?.enabled === true,
   });
   if (params.realtimeVoice) {
-    configuredAppServer = enableCodexRealtimeConversation(configuredAppServer);
+    configuredAppServer = enableCodexRealtimeConversation(
+      configuredAppServer,
+      params.realtimeVoice.request.providerConfig,
+    );
   }
   const effectiveWorkspace = sandbox?.enabled
     ? sandbox.workspaceAccess === "rw"
@@ -686,7 +689,10 @@ export async function runCodexAppServerAttempt(
     openClawSandboxActive: sandbox?.enabled === true,
   });
   if (params.realtimeVoice) {
-    configuredAppServer = enableCodexRealtimeConversation(configuredAppServer);
+    configuredAppServer = enableCodexRealtimeConversation(
+      configuredAppServer,
+      params.realtimeVoice.request.providerConfig,
+    );
   }
   policyAppServer = resolveCodexAppServerForOpenClawToolPolicy({
     appServer: configuredAppServer,

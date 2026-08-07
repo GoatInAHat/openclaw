@@ -22,6 +22,7 @@ import {
   resolveCodexAppServerNativeHomeDir,
 } from "./auth-bridge.js";
 import type { CodexAppServerStartOptions } from "./config.js";
+import { resolveCodexAppServerSpawnEnv } from "./transport-stdio.js";
 
 const oauthMocks = vi.hoisted(() => ({
   refreshOpenAICodexToken: vi.fn(),
@@ -353,10 +354,11 @@ describe("bridgeCodexAppServerStartOptions", () => {
     }
   });
 
-  it("keeps inherited API-key env vars for native realtime under subscription auth", async () => {
+  it("injects only the explicitly selected OpenAI realtime key under subscription auth", async () => {
     const agentDir = await fs.mkdtemp(path.join(os.tmpdir(), "openclaw-codex-app-server-"));
     const startOptions = createStartOptions({
       requiresRealtimeOpenAiApiKeyEnv: true,
+      env: { OPENAI_API_KEY: "selected-realtime-key" },
       clearEnv: ["FOO"],
     });
     try {
@@ -382,9 +384,45 @@ describe("bridgeCodexAppServerStartOptions", () => {
         ...startOptions,
         env: {
           CODEX_HOME: resolveCodexAppServerHomeDir(agentDir),
+          OPENAI_API_KEY: "selected-realtime-key",
         },
         clearEnv: ["FOO", "CODEX_API_KEY"],
       });
+      expect(
+        resolveCodexAppServerSpawnEnv(
+          await bridgeCodexAppServerStartOptions({ startOptions, agentDir }),
+          { OPENAI_API_KEY: "unrelated-ambient-key" },
+        ),
+      ).toMatchObject({ OPENAI_API_KEY: "selected-realtime-key" });
+    } finally {
+      await fs.rm(agentDir, { recursive: true, force: true });
+    }
+  });
+
+  it("rejects subscription realtime startup without a selected Platform key", async () => {
+    const agentDir = await fs.mkdtemp(path.join(os.tmpdir(), "openclaw-codex-app-server-"));
+    try {
+      upsertAuthProfile({
+        agentDir,
+        profileId: "openai:default",
+        credential: {
+          type: "oauth",
+          provider: "openai",
+          access: "access-token",
+          refresh: "refresh-token",
+          expires: Date.now() + 24 * 60 * 60_000,
+          accountId: "account-123",
+        },
+      });
+
+      await expect(
+        bridgeCodexAppServerStartOptions({
+          startOptions: createStartOptions({ requiresRealtimeOpenAiApiKeyEnv: true }),
+          agentDir,
+        }),
+      ).rejects.toThrow(
+        "Codex realtime v2 requires an explicitly selected OpenAI Platform API key",
+      );
     } finally {
       await fs.rm(agentDir, { recursive: true, force: true });
     }
