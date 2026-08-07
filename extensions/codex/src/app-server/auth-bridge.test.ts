@@ -353,6 +353,43 @@ describe("bridgeCodexAppServerStartOptions", () => {
     }
   });
 
+  it("keeps inherited API-key env vars for native realtime under subscription auth", async () => {
+    const agentDir = await fs.mkdtemp(path.join(os.tmpdir(), "openclaw-codex-app-server-"));
+    const startOptions = createStartOptions({
+      requiresRealtimeOpenAiApiKeyEnv: true,
+      clearEnv: ["FOO"],
+    });
+    try {
+      upsertAuthProfile({
+        agentDir,
+        profileId: "openai:default",
+        credential: {
+          type: "oauth",
+          provider: "openai",
+          access: "access-token",
+          refresh: "refresh-token",
+          expires: Date.now() + 24 * 60 * 60_000,
+          accountId: "account-123",
+        },
+      });
+
+      await expect(
+        bridgeCodexAppServerStartOptions({
+          startOptions,
+          agentDir,
+        }),
+      ).resolves.toEqual({
+        ...startOptions,
+        env: {
+          CODEX_HOME: resolveCodexAppServerHomeDir(agentDir),
+        },
+        clearEnv: ["FOO", "CODEX_API_KEY"],
+      });
+    } finally {
+      await fs.rm(agentDir, { recursive: true, force: true });
+    }
+  });
+
   it("clears an inherited OpenAI API key for an explicit Codex OAuth profile", async () => {
     const agentDir = await fs.mkdtemp(path.join(os.tmpdir(), "openclaw-codex-app-server-"));
     const startOptions = createStartOptions({ clearEnv: ["FOO"] });

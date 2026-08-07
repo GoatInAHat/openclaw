@@ -86,7 +86,12 @@ export async function bridgeCodexAppServerStartOptions(params: {
     config: params.config,
   });
   return shouldClearInheritedOpenAiApiKey
-    ? withClearedEnvironmentVariables(scopedStartOptions, CODEX_APP_SERVER_API_KEY_ENV_VARS)
+    ? withClearedEnvironmentVariables(
+        scopedStartOptions,
+        params.startOptions.requiresRealtimeOpenAiApiKeyEnv
+          ? [CODEX_API_KEY_ENV_VAR]
+          : CODEX_APP_SERVER_API_KEY_ENV_VARS,
+      )
     : scopedStartOptions;
 }
 
