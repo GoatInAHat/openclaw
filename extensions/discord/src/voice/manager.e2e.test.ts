@@ -1219,6 +1219,94 @@ describe("DiscordVoiceManager", () => {
     expectConnectedStatus(manager, "1001");
   });
 
+  it("rebinds a moderator-moved direct-agent bot to an owner present in the target", async () => {
+    useDirectAgentRealtimeProvider();
+    const secondOwnerId = "123456789012345679";
+    const firstConnection = createConnectionMock();
+    const secondConnection = createConnectionMock();
+    joinVoiceChannelMock.mockReturnValueOnce(firstConnection).mockReturnValueOnce(secondConnection);
+    const client = createClient();
+    client.rest.get
+      .mockResolvedValueOnce({
+        guild_id: "g1",
+        user_id: directAgentOwnerId,
+        channel_id: "1001",
+      })
+      .mockResolvedValueOnce({
+        guild_id: "g1",
+        user_id: secondOwnerId,
+        channel_id: "1002",
+      });
+    const manager = createManager(
+      {
+        allowFrom: [`discord:${directAgentOwnerId}`, `discord:${secondOwnerId}`],
+        voice: {
+          enabled: true,
+          mode: "agent-proxy",
+          realtime: { provider: "codex" },
+        },
+      },
+      client,
+    );
+    manager.setBotUserId("bot-user");
+    await manager.join(
+      { guildId: "g1", channelId: "1001" },
+      { requester: { senderId: directAgentOwnerId, senderIsOwner: true } },
+    );
+
+    await manager.handleVoiceStateUpdate({
+      guild_id: "g1",
+      user_id: "bot-user",
+      channel_id: "1002",
+    } as never);
+
+    expect(lastRealtimeBridgeParams()).toMatchObject({
+      senderId: secondOwnerId,
+      senderIsOwner: true,
+    });
+    expect(firstConnection.destroy).toHaveBeenCalledTimes(1);
+    expect(secondConnection.destroy).not.toHaveBeenCalled();
+    expectConnectedStatus(manager, "1002");
+  });
+
+  it("disconnects a moderator-moved direct-agent bot when the target has no owner", async () => {
+    useDirectAgentRealtimeProvider();
+    const connection = createConnectionMock();
+    joinVoiceChannelMock.mockReturnValueOnce(connection);
+    const client = createClient();
+    client.rest.get.mockResolvedValueOnce({
+      guild_id: "g1",
+      user_id: directAgentOwnerId,
+      channel_id: "1001",
+    });
+    const manager = createManager(
+      {
+        allowFrom: [`discord:${directAgentOwnerId}`],
+        voice: {
+          enabled: true,
+          mode: "agent-proxy",
+          realtime: { provider: "codex" },
+        },
+      },
+      client,
+    );
+    manager.setBotUserId("bot-user");
+    await manager.join(
+      { guildId: "g1", channelId: "1001" },
+      { requester: { senderId: directAgentOwnerId, senderIsOwner: true } },
+    );
+
+    await manager.handleVoiceStateUpdate({
+      guild_id: "g1",
+      user_id: "bot-user",
+      channel_id: "1002",
+    } as never);
+
+    expect(joinVoiceChannelMock).toHaveBeenCalledTimes(1);
+    expect(connection.destroy).toHaveBeenCalledTimes(1);
+    expect(manager.status()).toStrictEqual([]);
+  });
+
   it("suppresses repeated autoJoin attempts after fatal realtime startup failures", async () => {
     realtimeSessionMock.connect.mockRejectedValueOnce(new Error("Incorrect API key provided"));
     const manager = createManager({
