@@ -1,10 +1,16 @@
 // Coverage for incomplete-turn safety, retry instructions, and liveness states.
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { OpenClawConfig } from "../../config/config.js";
+import { getCommandLaneSnapshot } from "../../process/command-queue.js";
+import type {
+  RealtimeVoiceBridge,
+  RealtimeVoiceBridgeCreateRequest,
+} from "../../talk/provider-types.js";
 import {
   hasCommittedMessagingToolDeliveryEvidence,
   hasOutboundDeliveryEvidence,
 } from "./delivery-evidence.js";
+import { resolveGlobalLane, resolveSessionLane } from "./lanes.js";
 import { makeAttemptResult } from "./run.overflow-compaction.fixture.js";
 import {
   loadRunOverflowCompactionHarness,
@@ -42,6 +48,17 @@ import {
 import type { EmbeddedRunAttemptResult } from "./run/types.js";
 
 let runEmbeddedAgent: typeof import("./run.js").runEmbeddedAgent;
+
+function createDeferred(): { promise: Promise<void>; resolve: () => void } {
+  let resolve: (() => void) | undefined;
+  const promise = new Promise<void>((done) => {
+    resolve = done;
+  });
+  if (!resolve) {
+    throw new Error("Expected deferred resolver");
+  }
+  return { promise, resolve };
+}
 
 function resolveIncompleteTurnPayloadText(
   params: Omit<Parameters<typeof resolveIncompleteTurnPayloadTextCore>[0], "externalAbort"> & {
@@ -1027,6 +1044,51 @@ describe("runEmbeddedAgent incomplete-turn safety", () => {
     expectNoWarnMessageWith("missing assistant terminal message detected");
     expectNoWarnMessageWith("empty response detected");
     expectNoWarnMessageWith("reasoning-only assistant turn detected");
+  });
+
+  it("releases realtime voice lane occupancy after bridge startup", async () => {
+    const blocker = createDeferred();
+    const onBridgeReady = vi.fn();
+    const bridge = {} as RealtimeVoiceBridge;
+    mockedRunEmbeddedAttempt.mockImplementationOnce(async (attemptParams: unknown) => {
+      const realtimeVoice = (
+        attemptParams as {
+          realtimeVoice: { onBridgeReady: (readyBridge: RealtimeVoiceBridge) => void };
+        }
+      ).realtimeVoice;
+      realtimeVoice.onBridgeReady(bridge);
+      await blocker.promise;
+      return makeAttemptResult({
+        assistantTexts: [],
+        currentAttemptAssistant: undefined,
+        lastAssistant: undefined,
+      });
+    });
+    const sessionKey = "test-key-realtime-lane-release";
+    const lane = "voice";
+    let runSettled = false;
+    const run = runEmbeddedAgent({
+      ...overflowBaseRunParams,
+      sessionKey,
+      provider: "openai",
+      model: "gpt-5.5",
+      runId: "run-realtime-voice-lane-release",
+      lane,
+      realtimeVoice: {
+        request: {} as RealtimeVoiceBridgeCreateRequest,
+        onBridgeReady,
+      },
+    }).finally(() => {
+      runSettled = true;
+    });
+
+    await vi.waitFor(() => expect(onBridgeReady).toHaveBeenCalledWith(bridge));
+    expect(runSettled).toBe(false);
+    expect(getCommandLaneSnapshot(resolveSessionLane(sessionKey)).activeCount).toBe(0);
+    expect(getCommandLaneSnapshot(resolveGlobalLane(lane)).activeCount).toBe(0);
+
+    blocker.resolve();
+    await expect(run).resolves.toMatchObject({ payloads: undefined });
   });
 
   it("surfaces realtime voice errors without entering prompt failover", async () => {

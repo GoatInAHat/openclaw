@@ -58,8 +58,14 @@ export class GatewayDrainingError extends Error {
 // low-risk parallelism (e.g. cron jobs) without interleaving stdin / logs for
 // the main auto-reply workflow.
 
+export type CommandLaneTaskMarker = Readonly<{
+  lane: string;
+  taskId: number;
+  generation: number;
+}>;
+
 type QueueEntry = {
-  task: () => Promise<unknown>;
+  task: (marker: CommandLaneTaskMarker) => Promise<unknown>;
   resolve: (value: unknown) => void;
   reject: (reason?: unknown) => void;
   enqueuedAt: number;
@@ -205,8 +211,7 @@ function completeTask(state: LaneState, taskId: number, taskGeneration: number):
   if (taskGeneration !== state.generation) {
     return false;
   }
-  state.activeTaskIds.delete(taskId);
-  return true;
+  return state.activeTaskIds.delete(taskId);
 }
 
 function hasPendingActiveTasks(taskIds: Set<number>): boolean {
@@ -274,8 +279,12 @@ function enqueueLaneEntry(state: LaneState, entry: QueueEntry): void {
   state.queue.splice(insertAt, 0, entry);
 }
 
-async function runQueueEntryTask(lane: string, entry: QueueEntry): Promise<unknown> {
-  const taskPromise = Promise.resolve().then(entry.task);
+async function runQueueEntryTask(
+  lane: string,
+  entry: QueueEntry,
+  marker: CommandLaneTaskMarker,
+): Promise<unknown> {
+  const taskPromise = Promise.resolve().then(() => entry.task(marker));
   const taskTimeoutMs = normalizeTaskTimeoutMs(entry.taskTimeoutMs);
   if (taskTimeoutMs === undefined) {
     return await taskPromise;
@@ -411,7 +420,11 @@ function drainLane(lane: string) {
         void (async () => {
           const startTime = Date.now();
           try {
-            const result = await runQueueEntryTask(lane, entry);
+            const result = await runQueueEntryTask(lane, entry, {
+              lane,
+              taskId,
+              generation: taskGeneration,
+            });
             const completedCurrentGeneration = completeTask(state, taskId, taskGeneration);
             if (completedCurrentGeneration) {
               notifyActiveTaskWaiters();
@@ -474,7 +487,7 @@ export function setCommandLaneConcurrency(lane: string, maxConcurrent: number) {
 
 export function enqueueCommandInLane<T>(
   lane: string,
-  task: () => Promise<T>,
+  task: (marker: CommandLaneTaskMarker) => Promise<T>,
   opts?: CommandQueueEnqueueOptions,
 ): Promise<T> {
   const queueState = getQueueState();
@@ -486,7 +499,7 @@ export function enqueueCommandInLane<T>(
   const state = getLaneState(cleaned);
   return new Promise<T>((resolve, reject) => {
     enqueueLaneEntry(state, {
-      task: () => task(),
+      task: (marker) => task(marker),
       resolve: (value) => resolve(value as T),
       reject,
       enqueuedAt: Date.now(),
@@ -539,6 +552,21 @@ export function getCommandLaneSnapshot(lane: string = CommandLane.Main): Command
 export function getCommandLaneActiveTaskIds(lane: string = CommandLane.Main): number[] {
   const state = getQueueState().lanes.get(normalizeLane(lane));
   return state ? [...state.activeTaskIds] : [];
+}
+
+/** Release one task's concurrency slot without cancelling or settling its work. */
+export function releaseCommandLaneTask(marker: CommandLaneTaskMarker | undefined): boolean {
+  if (!marker) {
+    return false;
+  }
+  const lane = normalizeLane(marker.lane);
+  const state = getQueueState().lanes.get(lane);
+  if (!state || !completeTask(state, marker.taskId, marker.generation)) {
+    return false;
+  }
+  notifyActiveTaskWaiters();
+  drainLane(lane);
+  return true;
 }
 
 export function getCommandLaneSnapshots(): CommandLaneSnapshot[] {

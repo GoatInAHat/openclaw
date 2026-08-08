@@ -32,6 +32,7 @@ let getCommandLaneSnapshot: CommandQueueModule["getCommandLaneSnapshot"];
 let getCommandLaneSnapshots: CommandQueueModule["getCommandLaneSnapshots"];
 let getQueueSize: CommandQueueModule["getQueueSize"];
 let markGatewayDraining: CommandQueueModule["markGatewayDraining"];
+let releaseCommandLaneTask: CommandQueueModule["releaseCommandLaneTask"];
 let resetAllLanes: CommandQueueModule["resetAllLanes"];
 let resetCommandLane: CommandQueueModule["resetCommandLane"];
 let resetCommandQueueStateForTest: CommandQueueModule["resetCommandQueueStateForTest"];
@@ -104,6 +105,7 @@ describe("command queue", () => {
       getCommandLaneSnapshots,
       getQueueSize,
       markGatewayDraining,
+      releaseCommandLaneTask,
       resetAllLanes,
       resetCommandLane,
       resetCommandQueueStateForTest,
@@ -631,6 +633,36 @@ describe("command queue", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it("releases task occupancy without settling the running task", async () => {
+    const lane = `occupancy-release-lane-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    const blocker = createDeferred();
+    let firstSettled = false;
+    let releaseFirst: (() => boolean) | undefined;
+    const first = enqueueCommandInLane(lane, async (marker) => {
+      releaseFirst = () => releaseCommandLaneTask(marker);
+      await blocker.promise;
+      return "first";
+    }).finally(() => {
+      firstSettled = true;
+    });
+    let secondRan = false;
+    const second = enqueueCommandInLane(lane, async () => {
+      secondRan = true;
+      return "second";
+    });
+
+    await vi.waitFor(() => expect(releaseFirst).toBeTypeOf("function"));
+    expect(secondRan).toBe(false);
+    expect(releaseFirst?.()).toBe(true);
+
+    await expect(second).resolves.toBe("second");
+    expect(firstSettled).toBe(false);
+    expect(releaseFirst?.()).toBe(false);
+
+    blocker.resolve();
+    await expect(first).resolves.toBe("first");
   });
 
   it("task timeout falls back when progress timestamp callback throws", async () => {

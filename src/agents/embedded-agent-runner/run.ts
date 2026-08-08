@@ -40,7 +40,12 @@ import { redactIdentifier } from "../../logging/redact-identifier.js";
 import { buildAgentHookContextChannelFields } from "../../plugins/hook-agent-context.js";
 import { getGlobalHookRunner } from "../../plugins/hook-runner-global.js";
 import { resolveProviderAuthProfileId } from "../../plugins/provider-runtime.js";
-import { enqueueCommandInLane, getCommandLaneSnapshot } from "../../process/command-queue.js";
+import {
+  enqueueCommandInLane,
+  getCommandLaneSnapshot,
+  releaseCommandLaneTask,
+  type CommandLaneTaskMarker,
+} from "../../process/command-queue.js";
 import type { CommandQueueEnqueueOptions } from "../../process/command-queue.types.js";
 import { createAgentHarnessTaskRuntimeScope } from "../../tasks/agent-harness-task-runtime-scope.js";
 import { resolveUserPath } from "../../utils.js";
@@ -683,6 +688,8 @@ async function runEmbeddedAgentInternal(
   const laneTaskTimeoutMs = resolveEmbeddedRunLaneTimeoutMs(params.timeoutMs);
   const laneTaskAbortController = new AbortController();
   const laneTaskReleaseController = new AbortController();
+  let globalTaskMarker: CommandLaneTaskMarker | undefined;
+  let sessionTaskMarker: CommandLaneTaskMarker | undefined;
   let laneTaskProgressAtMs = Date.now();
   const noteLaneTaskProgress = () => {
     laneTaskProgressAtMs = Date.now();
@@ -777,7 +784,10 @@ async function runEmbeddedAgentInternal(
     noteLaneWaitIfBusy(globalLane);
     return enqueueCommandInLane(
       globalLane,
-      taskWithCurrentLifecycle,
+      (marker) => {
+        globalTaskMarker = marker;
+        return taskWithCurrentLifecycle();
+      },
       withLaneTimeout(withRunLaneWait(globalOpts)),
     );
   };
@@ -791,8 +801,29 @@ async function runEmbeddedAgentInternal(
       return params.enqueue(taskWithLaneAdmission, withRunLaneWait(sessionOpts));
     }
     noteLaneWaitIfBusy(sessionLane);
-    return enqueueCommandInLane(sessionLane, taskWithLaneAdmission, withRunLaneWait(sessionOpts));
+    return enqueueCommandInLane(
+      sessionLane,
+      (marker) => {
+        sessionTaskMarker = marker;
+        return taskWithLaneAdmission();
+      },
+      withRunLaneWait(sessionOpts),
+    );
   };
+  if (params.realtimeVoice) {
+    const realtimeVoice = params.realtimeVoice;
+    params = {
+      ...params,
+      realtimeVoice: {
+        ...realtimeVoice,
+        onBridgeReady: (bridge) => {
+          realtimeVoice.onBridgeReady(bridge);
+          releaseCommandLaneTask(globalTaskMarker);
+          releaseCommandLaneTask(sessionTaskMarker);
+        },
+      },
+    };
+  }
   const channelHint = params.messageChannel ?? params.messageProvider;
   const resolvedToolResultFormat =
     params.toolResultFormat ??
