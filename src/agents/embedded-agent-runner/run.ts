@@ -3148,6 +3148,9 @@ async function runEmbeddedAgentInternal(
             !hasRecoverableCodexAppServerTimeoutOutcome &&
             !shouldSurfaceCodexCompletionTimeout
           ) {
+            if (params.realtimeVoice !== undefined) {
+              throw toErrorObject(promptError, "Prompt failed");
+            }
             // Normalize wrapped errors (e.g. abort-wrapped RESOURCE_EXHAUSTED) into
             // FailoverError so rate-limit classification works even for nested shapes.
             //

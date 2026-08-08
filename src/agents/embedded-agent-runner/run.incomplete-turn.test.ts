@@ -10,6 +10,7 @@ import {
   loadRunOverflowCompactionHarness,
   mockedBuildEmbeddedRunPayloads,
   mockedClassifyFailoverReason,
+  mockedCoerceToFailoverError,
   mockedGlobalHookRunner,
   mockedIsFailoverAssistantError,
   mockedIsRateLimitAssistantError,
@@ -1026,6 +1027,30 @@ describe("runEmbeddedAgent incomplete-turn safety", () => {
     expectNoWarnMessageWith("missing assistant terminal message detected");
     expectNoWarnMessageWith("empty response detected");
     expectNoWarnMessageWith("reasoning-only assistant turn detected");
+  });
+
+  it("surfaces realtime voice errors without entering prompt failover", async () => {
+    const promptError = new Error("rate limit exceeded");
+    mockedRunEmbeddedAttempt.mockResolvedValueOnce(
+      makeAttemptResult({
+        assistantTexts: [],
+        promptError,
+        promptErrorSource: "prompt",
+      }),
+    );
+
+    await expect(
+      runEmbeddedAgent({
+        ...overflowBaseRunParams,
+        provider: "openai",
+        model: "gpt-5.5",
+        runId: "run-realtime-voice-prompt-failure",
+        realtimeVoice: {} as NonNullable<Parameters<typeof runEmbeddedAgent>[0]["realtimeVoice"]>,
+      }),
+    ).rejects.toBe(promptError);
+
+    expect(mockedRunEmbeddedAttempt).toHaveBeenCalledTimes(1);
+    expect(mockedCoerceToFailoverError).not.toHaveBeenCalled();
   });
 
   it("retries zero-token empty Claude stop turns with a visible-answer continuation instruction", async () => {
