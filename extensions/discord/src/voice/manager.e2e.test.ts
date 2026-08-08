@@ -2445,20 +2445,22 @@ describe("DiscordVoiceManager", () => {
 
   it.each([
     {
-      name: "provider error",
+      name: "keeps direct-agent voice alive after a recoverable provider error",
       terminate: (bridgeParams: {
         onError?: (error: Error) => void;
         onClose?: (reason: "completed" | "error") => void;
       }) => bridgeParams.onError?.(new Error("upstream realtime reset")),
+      remainsConnected: true,
     },
     {
-      name: "unexpected provider close",
+      name: "tears down direct-agent voice after an unexpected provider close",
       terminate: (bridgeParams: {
         onError?: (error: Error) => void;
         onClose?: (reason: "completed" | "error") => void;
       }) => bridgeParams.onClose?.("completed"),
+      remainsConnected: false,
     },
-  ])("tears down direct-agent voice after $name", async ({ terminate }) => {
+  ])("$name", async ({ terminate, remainsConnected }) => {
     resolveConfiguredRealtimeVoiceProviderMock.mockReturnValue({
       provider: {
         id: "codex",
@@ -2489,9 +2491,9 @@ describe("DiscordVoiceManager", () => {
     );
     terminate(lastRealtimeBridgeParams());
 
-    expect(manager.status()).toEqual([]);
-    expect(realtimeSessionMock.close).toHaveBeenCalledOnce();
-    expect(connection.destroy).toHaveBeenCalledOnce();
+    expect(manager.status()).toHaveLength(remainsConnected ? 1 : 0);
+    expect(realtimeSessionMock.close).toHaveBeenCalledTimes(remainsConnected ? 0 : 1);
+    expect(connection.destroy).toHaveBeenCalledTimes(remainsConnected ? 0 : 1);
   });
 
   it("handles semantic realtime agent-control tool calls in Discord VC", async () => {

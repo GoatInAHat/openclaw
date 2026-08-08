@@ -602,7 +602,6 @@ export class DiscordRealtimeVoiceSession implements VoiceRealtimeSession {
       },
       onError: (error) => {
         this.logRealtimeError(formatErrorMessage(error));
-        reportTerminalFailure(error);
       },
       onClose: (reason) => {
         this.flushSuppressedRealtimeErrors();
