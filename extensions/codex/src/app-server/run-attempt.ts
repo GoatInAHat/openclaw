@@ -2737,8 +2737,14 @@ export async function runCodexAppServerAttempt(
     runAbortController.signal.addEventListener("abort", onRealtimeAbort, { once: true });
     try {
       realtimeVoice.onBridgeReady(bridge);
-      await bridge.completion.promise;
-      return buildRealtimeVoiceAttemptResult({ attempt: params, systemPromptReport });
+      const closeReason = await bridge.completion.promise;
+      return buildRealtimeVoiceAttemptResult({
+        attempt: params,
+        systemPromptReport,
+        ...(closeReason === "error"
+          ? { failure: bridge.getFailure() ?? new Error("Codex realtime voice session failed") }
+          : {}),
+      });
     } finally {
       runAbortController.signal.removeEventListener("abort", onRealtimeAbort);
       bridge.close();

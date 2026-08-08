@@ -2443,6 +2443,57 @@ describe("DiscordVoiceManager", () => {
     expect(agentCommandMock).not.toHaveBeenCalled();
   });
 
+  it.each([
+    {
+      name: "provider error",
+      terminate: (bridgeParams: {
+        onError?: (error: Error) => void;
+        onClose?: (reason: "completed" | "error") => void;
+      }) => bridgeParams.onError?.(new Error("upstream realtime reset")),
+    },
+    {
+      name: "unexpected provider close",
+      terminate: (bridgeParams: {
+        onError?: (error: Error) => void;
+        onClose?: (reason: "completed" | "error") => void;
+      }) => bridgeParams.onClose?.("completed"),
+    },
+  ])("tears down direct-agent voice after $name", async ({ terminate }) => {
+    resolveConfiguredRealtimeVoiceProviderMock.mockReturnValue({
+      provider: {
+        id: "codex",
+        capabilities: {
+          transports: ["provider-websocket"],
+          inputAudioFormats: [],
+          outputAudioFormats: [],
+          supportsToolCalls: false,
+          handlesAgentTurns: true,
+        },
+      },
+      providerConfig: { model: "gpt-live-1-codex", voice: "arbor" },
+    } as never);
+    const manager = createManager({
+      groupPolicy: "open",
+      voice: {
+        enabled: true,
+        mode: "agent-proxy",
+        realtime: { provider: "codex" },
+      },
+    });
+    const connection = createConnectionMock();
+    joinVoiceChannelMock.mockReturnValueOnce(connection);
+
+    await manager.join(
+      { guildId: "g1", channelId: "1001" },
+      { requester: { senderId: "u-owner", senderIsOwner: true } },
+    );
+    terminate(lastRealtimeBridgeParams());
+
+    expect(manager.status()).toEqual([]);
+    expect(realtimeSessionMock.close).toHaveBeenCalledOnce();
+    expect(connection.destroy).toHaveBeenCalledOnce();
+  });
+
   it("handles semantic realtime agent-control tool calls in Discord VC", async () => {
     controlRealtimeVoiceAgentRunMock.mockResolvedValueOnce({
       ok: true,

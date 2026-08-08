@@ -888,6 +888,15 @@ export class DiscordVoiceManager {
       entry,
       mode: voiceMode,
       requester: options?.requester,
+      onTerminalError: (error) => {
+        logger.error(
+          `discord voice: realtime session failed terminally guild=${entry.guildId} channel=${entry.channelId}: ${formatErrorMessage(error)}`,
+        );
+        if (this.sessions.get(entry.guildId) === entry) {
+          this.sessions.delete(entry.guildId);
+        }
+        entry.stop();
+      },
       runAgentTurn: ({ context, message, toolsAllow, userId }) =>
         this.runDiscordRealtimeAgentTurn({ context, entry, message, toolsAllow, userId }),
     });
