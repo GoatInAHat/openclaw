@@ -412,6 +412,23 @@ describe("DiscordVoiceManager", () => {
       runtime: createRuntime(),
     });
 
+  const useDirectAgentRealtimeProvider = () => {
+    resolveConfiguredRealtimeVoiceProviderMock.mockReturnValue({
+      provider: {
+        id: "codex",
+        capabilities: {
+          transports: ["bridge"],
+          inputAudioFormats: [],
+          outputAudioFormats: [],
+          supportsToolCalls: false,
+          handlesAgentTurns: true,
+        },
+      },
+      providerConfig: { model: "gpt-live-1-codex", voice: "arbor" },
+    } as never);
+  };
+  const directAgentOwnerId = "123456789012345678";
+
   const expectConnectedStatus = (
     manager: InstanceType<typeof managerModule.DiscordVoiceManager>,
     channelId: string,
@@ -1068,6 +1085,44 @@ describe("DiscordVoiceManager", () => {
     expectConnectedStatus(manager, "1002");
   });
 
+  it("autoJoin carries a configured verified owner into direct-agent realtime", async () => {
+    useDirectAgentRealtimeProvider();
+    const manager = createManager({
+      allowFrom: [`discord:${directAgentOwnerId}`],
+      voice: {
+        enabled: true,
+        mode: "agent-proxy",
+        realtime: { provider: "codex" },
+        autoJoin: [{ guildId: "g1", channelId: "1001" }],
+      },
+    });
+
+    await manager.autoJoin();
+
+    expect(lastRealtimeBridgeParams()).toMatchObject({
+      senderId: directAgentOwnerId,
+      senderIsOwner: true,
+    });
+    expectConnectedStatus(manager, "1001");
+  });
+
+  it("rejects unowned direct-agent autoJoin before opening a voice connection", async () => {
+    useDirectAgentRealtimeProvider();
+    const manager = createManager({
+      voice: {
+        enabled: true,
+        mode: "agent-proxy",
+        realtime: { provider: "codex" },
+        autoJoin: [{ guildId: "g1", channelId: "1001" }],
+      },
+    });
+
+    await manager.autoJoin();
+
+    expect(joinVoiceChannelMock).not.toHaveBeenCalled();
+    expect(manager.status()).toStrictEqual([]);
+  });
+
   it("suppresses repeated autoJoin attempts after fatal realtime startup failures", async () => {
     realtimeSessionMock.connect.mockRejectedValueOnce(new Error("Incorrect API key provided"));
     const manager = createManager({
@@ -1136,6 +1191,52 @@ describe("DiscordVoiceManager", () => {
 
     expect(joinVoiceChannelMock).toHaveBeenCalledTimes(1);
     expectConnectedStatus(manager, "1001");
+  });
+
+  it("uses the followed verified owner for direct-agent realtime", async () => {
+    useDirectAgentRealtimeProvider();
+    const manager = createManager({
+      allowFrom: [`discord:${directAgentOwnerId}`],
+      voice: {
+        enabled: true,
+        mode: "agent-proxy",
+        realtime: { provider: "codex" },
+        followUsers: [directAgentOwnerId],
+      },
+    });
+
+    await manager.handleVoiceStateUpdate({
+      guild_id: "g1",
+      user_id: directAgentOwnerId,
+      channel_id: "1001",
+    } as never);
+
+    expect(lastRealtimeBridgeParams()).toMatchObject({
+      senderId: directAgentOwnerId,
+      senderIsOwner: true,
+    });
+    expectConnectedStatus(manager, "1001");
+  });
+
+  it("rejects unowned direct-agent follow before opening a voice connection", async () => {
+    useDirectAgentRealtimeProvider();
+    const manager = createManager({
+      voice: {
+        enabled: true,
+        mode: "agent-proxy",
+        realtime: { provider: "codex" },
+        followUsers: ["u-guest"],
+      },
+    });
+
+    await manager.handleVoiceStateUpdate({
+      guild_id: "g1",
+      user_id: "u-guest",
+      channel_id: "1001",
+    } as never);
+
+    expect(joinVoiceChannelMock).not.toHaveBeenCalled();
+    expect(manager.status()).toStrictEqual([]);
   });
 
   it("does not follow configured users when followUsersEnabled is false", async () => {
