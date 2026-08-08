@@ -26,6 +26,7 @@ import {
   shouldAutoApproveCodexAppServerApprovals,
   withMcpElicitationsApprovalPolicy,
 } from "./config.js";
+import { resolveCodexAppServerSpawnEnv } from "./transport-stdio.js";
 
 type RuntimeOptionsParams = NonNullable<Parameters<typeof resolveCodexAppServerRuntimeOptions>[0]>;
 
@@ -89,7 +90,11 @@ function expectUiHintLabel(manifest: { uiHints: Record<string, unknown> }, key: 
 
 describe("Codex app-server config", () => {
   it("enables realtime conversation only for spawned app-server clients", () => {
-    const stdio = resolveRuntimeForTest();
+    const resolved = resolveRuntimeForTest();
+    const stdio = {
+      ...resolved,
+      start: { ...resolved.start, clearEnv: ["KEEP_CLEAR"] },
+    };
     const enabled = enableCodexRealtimeConversation(stdio);
 
     expect(enabled.start.args).toEqual([
@@ -101,7 +106,24 @@ describe("Codex app-server config", () => {
     ]);
     expect(enabled.start.requiresRealtimeOpenAiApiKeyEnv).toBeUndefined();
     expect(enabled.start.env?.OPENAI_API_KEY).toBeUndefined();
+    expect(enabled.start.clearEnv).toEqual(["KEEP_CLEAR", "CODEX_API_KEY", "OPENAI_API_KEY"]);
+    expect(
+      resolveCodexAppServerSpawnEnv(enabled.start, {
+        KEEP: "1",
+        CODEX_API_KEY: "ambient-codex-key",
+        OPENAI_API_KEY: "ambient-openai-key",
+      }),
+    ).toEqual({ KEEP: "1" });
     expect(enableCodexRealtimeConversation(enabled)).toBe(enabled);
+
+    const enabledWithoutIsolation = {
+      ...stdio,
+      start: { ...stdio.start, args: enabled.start.args },
+    };
+    const isolated = enableCodexRealtimeConversation(enabledWithoutIsolation);
+    expect(isolated).not.toBe(enabledWithoutIsolation);
+    expect(isolated.start.args).toBe(enabledWithoutIsolation.start.args);
+    expect(isolated.start.clearEnv).toEqual(["KEEP_CLEAR", "CODEX_API_KEY", "OPENAI_API_KEY"]);
 
     const selectedV2 = enableCodexRealtimeConversation(stdio, {
       version: "v2",

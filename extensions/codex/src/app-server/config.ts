@@ -743,12 +743,20 @@ export function enableCodexRealtimeConversation(
   // OAuth session and negotiates the WebRTC call; only legacy V1/V2 websocket
   // sessions require an explicitly selected OpenAI Platform key.
   if (version === "v3") {
-    if (featureEnabled) {
+    const clearEnv = appServer.start.clearEnv ?? [];
+    const missingPlatformApiKeyEnvVars = ["CODEX_API_KEY", "OPENAI_API_KEY"].filter(
+      (envVar) => !clearEnv.includes(envVar),
+    );
+    if (featureEnabled && missingPlatformApiKeyEnvVars.length === 0) {
       return appServer;
     }
     return {
       ...appServer,
-      start: { ...appServer.start, args: [...args, "--enable", "realtime_conversation"] },
+      start: {
+        ...appServer.start,
+        clearEnv: [...clearEnv, ...missingPlatformApiKeyEnvVars],
+        ...(featureEnabled ? {} : { args: [...args, "--enable", "realtime_conversation"] }),
+      },
     };
   }
   const openAiApiKey = readNonEmptyString(providerConfig.apiKey);
