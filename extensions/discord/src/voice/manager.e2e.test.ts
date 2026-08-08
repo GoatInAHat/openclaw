@@ -900,6 +900,30 @@ describe("DiscordVoiceManager", () => {
     expect(entry.realtime).toBeUndefined();
   });
 
+  it("returns a startup error when realtime closes before voice handlers are installed", async () => {
+    const manager = createManager({
+      groupPolicy: "open",
+      voice: {
+        enabled: true,
+        mode: "agent-proxy",
+        realtime: { provider: "openai" },
+      },
+    });
+    realtimeSessionMock.connect.mockImplementationOnce(async () => {
+      const bridgeParams = createRealtimeVoiceBridgeSessionMock.mock.calls.at(-1)?.[0] as
+        | { onClose?: (reason: "error") => void }
+        | undefined;
+      bridgeParams?.onClose?.("error");
+    });
+
+    const result = await manager.join({ guildId: "g1", channelId: "1001" });
+
+    expect(result.ok).toBe(false);
+    expect(result.message).toContain("stopped before startup completed");
+    expect(joinVoiceChannelMock.mock.results.at(-1)?.value.destroy).toHaveBeenCalled();
+    expect(manager.status()).toHaveLength(0);
+  });
+
   it("detaches transcripts without leaving voice during pending realtime upgrade", async () => {
     const manager = createManager({
       groupPolicy: "open",

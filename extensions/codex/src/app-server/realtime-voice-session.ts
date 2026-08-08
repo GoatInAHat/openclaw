@@ -489,8 +489,11 @@ export class CodexAppServerRealtimeVoiceBridge implements RealtimeVoiceBridge {
     this.audioQueue = [];
     this.queuedAudioBytes = 0;
     this.activeAudioBytes = 0;
-    this.request.onClose?.(reason);
-    this.completion.resolve(reason);
+    try {
+      this.request.onClose?.(reason);
+    } finally {
+      this.completion.resolve(reason);
+    }
   }
 }
 
