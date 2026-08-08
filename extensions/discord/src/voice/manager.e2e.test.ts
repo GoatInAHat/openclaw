@@ -1085,17 +1085,27 @@ describe("DiscordVoiceManager", () => {
     expectConnectedStatus(manager, "1002");
   });
 
-  it("autoJoin carries a configured verified owner into direct-agent realtime", async () => {
+  it("autoJoin binds the configured owner present in the target channel", async () => {
     useDirectAgentRealtimeProvider();
-    const manager = createManager({
-      allowFrom: [`discord:${directAgentOwnerId}`],
-      voice: {
-        enabled: true,
-        mode: "agent-proxy",
-        realtime: { provider: "codex" },
-        autoJoin: [{ guildId: "g1", channelId: "1001" }],
-      },
+    const absentOwnerId = "123456789012345679";
+    const client = createClient();
+    client.rest.get.mockRejectedValueOnce(new Error("Unknown Voice State")).mockResolvedValueOnce({
+      guild_id: "g1",
+      user_id: directAgentOwnerId,
+      channel_id: "1001",
     });
+    const manager = createManager(
+      {
+        allowFrom: [`discord:${absentOwnerId}`, `discord:${directAgentOwnerId}`],
+        voice: {
+          enabled: true,
+          mode: "agent-proxy",
+          realtime: { provider: "codex" },
+          autoJoin: [{ guildId: "g1", channelId: "1001" }],
+        },
+      },
+      client,
+    );
 
     await manager.autoJoin();
 
@@ -1104,6 +1114,40 @@ describe("DiscordVoiceManager", () => {
       senderIsOwner: true,
     });
     expectConnectedStatus(manager, "1001");
+  });
+
+  it("rejects ambiguous direct-agent autoJoin owner binding", async () => {
+    useDirectAgentRealtimeProvider();
+    const secondOwnerId = "123456789012345679";
+    const client = createClient();
+    client.rest.get
+      .mockResolvedValueOnce({
+        guild_id: "g1",
+        user_id: directAgentOwnerId,
+        channel_id: "1001",
+      })
+      .mockResolvedValueOnce({
+        guild_id: "g1",
+        user_id: secondOwnerId,
+        channel_id: "1001",
+      });
+    const manager = createManager(
+      {
+        allowFrom: [`discord:${directAgentOwnerId}`, `discord:${secondOwnerId}`],
+        voice: {
+          enabled: true,
+          mode: "agent-proxy",
+          realtime: { provider: "codex" },
+          autoJoin: [{ guildId: "g1", channelId: "1001" }],
+        },
+      },
+      client,
+    );
+
+    await manager.autoJoin();
+
+    expect(joinVoiceChannelMock).not.toHaveBeenCalled();
+    expect(manager.status()).toStrictEqual([]);
   });
 
   it("rejects unowned direct-agent autoJoin before opening a voice connection", async () => {
@@ -1121,6 +1165,33 @@ describe("DiscordVoiceManager", () => {
 
     expect(joinVoiceChannelMock).not.toHaveBeenCalled();
     expect(manager.status()).toStrictEqual([]);
+  });
+
+  it("rejects a manual non-owner replacement before leaving the owner session", async () => {
+    useDirectAgentRealtimeProvider();
+    const connection = createConnectionMock();
+    joinVoiceChannelMock.mockReturnValueOnce(connection);
+    const manager = createManager({
+      voice: {
+        enabled: true,
+        mode: "agent-proxy",
+        realtime: { provider: "codex" },
+      },
+    });
+    await manager.join(
+      { guildId: "g1", channelId: "1001" },
+      { requester: { senderId: directAgentOwnerId, senderIsOwner: true } },
+    );
+
+    const result = await manager.join(
+      { guildId: "g1", channelId: "1002" },
+      { requester: { senderId: "u-guest", senderIsOwner: false } },
+    );
+
+    expect(result.ok).toBe(false);
+    expect(joinVoiceChannelMock).toHaveBeenCalledTimes(1);
+    expect(connection.destroy).not.toHaveBeenCalled();
+    expectConnectedStatus(manager, "1001");
   });
 
   it("suppresses repeated autoJoin attempts after fatal realtime startup failures", async () => {
@@ -3790,7 +3861,7 @@ describe("DiscordVoiceManager", () => {
   });
 
   it("leaves non-OpenAI agent-proxy realtime auto-response enabled when wake names are requested", async () => {
-    resolveConfiguredRealtimeVoiceProviderMock.mockReturnValueOnce({
+    resolveConfiguredRealtimeVoiceProviderMock.mockReturnValue({
       provider: { id: "google" },
       providerConfig: { model: "gemini-live", voice: "default" },
     });
