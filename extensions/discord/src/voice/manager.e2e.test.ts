@@ -446,8 +446,21 @@ describe("DiscordVoiceManager", () => {
   const getSessionEntry = (
     manager: InstanceType<typeof managerModule.DiscordVoiceManager>,
     guildId = "g1",
-  ) => {
-    const entry = (manager as unknown as { sessions: Map<string, unknown> }).sessions.get(guildId);
+  ): {
+    realtime?: unknown;
+    transcripts?: { onUtterance?: (...args: unknown[]) => unknown; sessionId: string };
+  } => {
+    const entry = (
+      manager as unknown as {
+        sessions: Map<
+          string,
+          {
+            realtime?: unknown;
+            transcripts?: { onUtterance?: (...args: unknown[]) => unknown; sessionId: string };
+          }
+        >;
+      }
+    ).sessions.get(guildId);
     if (!entry) {
       throw new Error(`expected Discord voice session for guild ${guildId}`);
     }
@@ -5766,6 +5779,63 @@ describe("DiscordVoiceManager", () => {
       expect(connection.daveSetPassthroughMode).toHaveBeenCalledWith(true, 15);
       expect(joinVoiceChannelMock).toHaveBeenCalledTimes(2);
     });
+  });
+
+  it("preserves transcript-only capture through DAVE receive recovery", async () => {
+    useDirectAgentRealtimeProvider();
+    joinVoiceChannelMock
+      .mockReturnValueOnce(createConnectionMock())
+      .mockReturnValueOnce(createConnectionMock());
+    const manager = createManager({
+      groupPolicy: "open",
+      voice: { enabled: true, mode: "agent-proxy", realtime: { provider: "codex" } },
+    });
+    const onUtterance = vi.fn();
+
+    await manager.join(
+      { guildId: "g1", channelId: "1001" },
+      { transcripts: { sessionId: "notes-1", onUtterance } },
+    );
+    emitDecryptFailure(manager);
+    emitDecryptFailure(manager);
+    emitDecryptFailure(manager);
+
+    await vi.waitFor(() => expect(joinVoiceChannelMock).toHaveBeenCalledTimes(2));
+    const entry = getSessionEntry(manager);
+    expect(entry.transcripts).toEqual({ sessionId: "notes-1", onUtterance });
+    expect(entry.realtime).toBeUndefined();
+    expect(createRealtimeVoiceBridgeSessionMock).not.toHaveBeenCalled();
+    expectConnectedStatus(manager, "1001");
+  });
+
+  it("preserves realtime and transcripts through DAVE receive recovery", async () => {
+    useDirectAgentRealtimeProvider();
+    joinVoiceChannelMock
+      .mockReturnValueOnce(createConnectionMock())
+      .mockReturnValueOnce(createConnectionMock());
+    const manager = createManager({
+      groupPolicy: "open",
+      voice: { enabled: true, mode: "agent-proxy", realtime: { provider: "codex" } },
+    });
+    const onUtterance = vi.fn();
+
+    await manager.join(
+      { guildId: "g1", channelId: "1001" },
+      { requester: { senderId: "u-owner", senderIsOwner: true } },
+    );
+    await manager.join(
+      { guildId: "g1", channelId: "1001" },
+      { transcripts: { sessionId: "notes-1", onUtterance } },
+    );
+    emitDecryptFailure(manager);
+    emitDecryptFailure(manager);
+    emitDecryptFailure(manager);
+
+    await vi.waitFor(() => expect(createRealtimeVoiceBridgeSessionMock).toHaveBeenCalledTimes(2));
+    const entry = getSessionEntry(manager);
+    expect(entry.transcripts).toEqual({ sessionId: "notes-1", onUtterance });
+    expect(entry.realtime).toBeDefined();
+    expectConnectedStatus(manager, "1001");
   });
 
   it("preserves the verified requester when direct-agent realtime recovers from DAVE failures", async () => {
