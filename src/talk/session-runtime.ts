@@ -81,6 +81,7 @@ export function createRealtimeVoiceBridgeSession(
   params: RealtimeVoiceBridgeSessionParams,
 ): RealtimeVoiceBridgeSession {
   const bridgeRef: { current?: RealtimeVoiceBridge } = {};
+  let greetingTriggered = false;
   const requireBridge = () => {
     if (!bridgeRef.current) {
       throw new Error("Realtime voice bridge is not ready");
@@ -153,7 +154,8 @@ export function createRealtimeVoiceBridgeSession(
       if (!bridgeRef.current) {
         return;
       }
-      if (params.triggerGreetingOnReady) {
+      if (params.triggerGreetingOnReady && !greetingTriggered) {
+        greetingTriggered = true;
         bridgeRef.current.triggerGreeting?.(params.initialGreetingInstructions);
       }
       params.onReady?.(session);
