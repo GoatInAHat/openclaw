@@ -495,6 +495,7 @@ export class DiscordVoiceManager {
       automatic?: boolean;
       preserveFollowState?: boolean;
       requester?: { senderId: string; senderIsOwner: boolean };
+      startRealtime?: boolean;
       transcripts?: VoiceSessionEntry["transcripts"];
     },
   ): Promise<VoiceOperationResult> {
@@ -562,6 +563,7 @@ export class DiscordVoiceManager {
       automatic?: boolean;
       preserveFollowState?: boolean;
       requester?: { senderId: string; senderIsOwner: boolean };
+      startRealtime?: boolean;
       transcripts?: VoiceSessionEntry["transcripts"];
     },
   ): Promise<VoiceOperationResult> {
@@ -569,10 +571,11 @@ export class DiscordVoiceManager {
     const voiceConfig = this.params.discordConfig.voice;
     const voiceMode = resolveDiscordVoiceMode(voiceConfig);
     const existing = this.sessions.get(guildId);
+    const startRealtime = !options?.transcripts || options.startRealtime === true;
     const requester =
       options?.requester ?? (existing?.channelId === channelId ? existing.requester : undefined);
     if (
-      !options?.transcripts &&
+      startRealtime &&
       isDiscordRealtimeVoiceMode(voiceMode) &&
       (!requester?.senderId.trim() || !requester.senderIsOwner)
     ) {
@@ -608,7 +611,7 @@ export class DiscordVoiceManager {
       if (options?.transcripts) {
         existing.transcripts = options.transcripts;
       }
-      if (!options?.transcripts && isDiscordRealtimeVoiceMode(voiceMode) && !existing.realtime) {
+      if (startRealtime && isDiscordRealtimeVoiceMode(voiceMode) && !existing.realtime) {
         const realtimeResult = await this.attachRealtimeSession(existing, voiceMode, {
           requireLiveEntry: true,
           requester: existing.requester,
@@ -860,7 +863,7 @@ export class DiscordVoiceManager {
       },
     };
 
-    if (!options?.transcripts && isDiscordRealtimeVoiceMode(voiceMode)) {
+    if (startRealtime && isDiscordRealtimeVoiceMode(voiceMode)) {
       const realtimeResult = await this.attachRealtimeSession(entry, voiceMode, {
         requester: entry.requester,
       });
@@ -1117,12 +1120,17 @@ export class DiscordVoiceManager {
         );
         const preserveFollowState = this.isFollowOwnedGuild(guildId);
         const requester = await this.resolvePresentAutomaticRequester({ guildId, channelId });
+        const transcripts = existing.transcripts;
+        const startRealtime = Boolean(
+          transcripts && (existing.realtime || existing.pendingRealtime),
+        );
         const result = await this.join(
           { guildId, channelId },
           {
             automatic: true,
             preserveFollowState,
             ...(requester ? { requester } : {}),
+            ...(transcripts ? { startRealtime, transcripts } : {}),
           },
         );
         if (!result.ok && this.sessions.get(guildId) === existing) {
