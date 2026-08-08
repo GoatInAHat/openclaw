@@ -1143,6 +1143,9 @@ export class DiscordVoiceManager {
       return;
     }
 
+    const transcripts = existing?.transcripts;
+    const startRealtime = Boolean(transcripts && (existing?.realtime || existing?.pendingRealtime));
+
     logger.warn(
       `discord voice: bot moved to non-allowed channel guild=${guildId} channel=${channelId}; leaving`,
     );
@@ -1169,7 +1172,11 @@ export class DiscordVoiceManager {
         `discord voice: rejoining allowed voice channel guild=${guildId} channel=${target.channelId}`,
       );
       const requester = await this.resolvePresentAutomaticRequester(target);
-      await this.join(target, { automatic: true, ...(requester ? { requester } : {}) });
+      await this.join(target, {
+        automatic: true,
+        ...(requester ? { requester } : {}),
+        ...(transcripts ? { startRealtime, transcripts } : {}),
+      });
     }
   }
 
