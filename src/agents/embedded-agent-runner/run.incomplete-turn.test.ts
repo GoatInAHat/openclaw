@@ -1004,6 +1004,30 @@ describe("runEmbeddedAgent incomplete-turn safety", () => {
     expectNoWarnMessageWith("incomplete turn detected");
   });
 
+  it("completes a closed realtime voice operation without retrying an empty terminal", async () => {
+    mockedRunEmbeddedAttempt.mockResolvedValueOnce(
+      makeAttemptResult({
+        assistantTexts: [],
+        currentAttemptAssistant: undefined,
+        lastAssistant: undefined,
+      }),
+    );
+
+    const result = await runEmbeddedAgent({
+      ...overflowBaseRunParams,
+      provider: "openai",
+      model: "gpt-5.5",
+      runId: "run-realtime-voice-close",
+      realtimeVoice: {} as NonNullable<Parameters<typeof runEmbeddedAgent>[0]["realtimeVoice"]>,
+    });
+
+    expect(mockedRunEmbeddedAttempt).toHaveBeenCalledTimes(1);
+    expect(result.payloads).toBeUndefined();
+    expectNoWarnMessageWith("missing assistant terminal message detected");
+    expectNoWarnMessageWith("empty response detected");
+    expectNoWarnMessageWith("reasoning-only assistant turn detected");
+  });
+
   it("retries zero-token empty Claude stop turns with a visible-answer continuation instruction", async () => {
     mockedClassifyFailoverReason.mockReturnValue(null);
     mockedRunEmbeddedAttempt.mockResolvedValueOnce(

@@ -702,6 +702,31 @@ describe("DiscordVoiceManager", () => {
     });
   });
 
+  it("allows transcript-only joins without a direct-agent realtime owner", async () => {
+    useDirectAgentRealtimeProvider();
+    const manager = createManager({
+      voice: {
+        enabled: true,
+        mode: "agent-proxy",
+        realtime: { provider: "codex" },
+      },
+    });
+    const onUtterance = vi.fn();
+
+    const result = await manager.join(
+      { guildId: "g1", channelId: "1001" },
+      { transcripts: { sessionId: "notes-1", onUtterance } },
+    );
+
+    const entry = getSessionEntry(manager) as {
+      transcripts?: { sessionId: string; onUtterance: typeof onUtterance };
+    };
+    expect(result.ok).toBe(true);
+    expect(entry.transcripts).toEqual({ sessionId: "notes-1", onUtterance });
+    expect(createRealtimeVoiceBridgeSessionMock).not.toHaveBeenCalled();
+    expectConnectedStatus(manager, "1001");
+  });
+
   it("does not leave a newer transcripts-only session for a stale stop", async () => {
     const manager = createManager({
       groupPolicy: "open",
@@ -1310,6 +1335,35 @@ describe("DiscordVoiceManager", () => {
     expect(manager.status()).toStrictEqual([]);
   });
 
+  it("does not inherit an owner when a followed non-owner moves channels", async () => {
+    useDirectAgentRealtimeProvider();
+    const connection = createConnectionMock();
+    joinVoiceChannelMock.mockReturnValueOnce(connection);
+    const manager = createManager({
+      allowFrom: [`discord:${directAgentOwnerId}`],
+      voice: {
+        enabled: true,
+        mode: "agent-proxy",
+        realtime: { provider: "codex" },
+        followUsers: ["u-guest"],
+      },
+    });
+    await manager.join(
+      { guildId: "g1", channelId: "1001" },
+      { requester: { senderId: directAgentOwnerId, senderIsOwner: true } },
+    );
+
+    await manager.handleVoiceStateUpdate({
+      guild_id: "g1",
+      user_id: "u-guest",
+      channel_id: "1002",
+    } as never);
+
+    expect(joinVoiceChannelMock).toHaveBeenCalledTimes(1);
+    expect(connection.destroy).not.toHaveBeenCalled();
+    expectConnectedStatus(manager, "1001");
+  });
+
   it("does not follow configured users when followUsersEnabled is false", async () => {
     const manager = createManager({
       voice: {
@@ -1902,6 +1956,60 @@ describe("DiscordVoiceManager", () => {
     expect(subscribeCall?.[0]).toBe("u1");
     expect(requireRecord(subscribeCall?.[1], "subscribe options").end).toBeTypeOf("object");
     bridgeParams?.onEvent?.({ direction: "server", type: "response.done" });
+  });
+
+  it("rejects an unbound direct-agent speaker before barge-in or capture", async () => {
+    useDirectAgentRealtimeProvider();
+    const connection = createConnectionMock();
+    joinVoiceChannelMock.mockReturnValueOnce(connection);
+    const manager = createManager(
+      {
+        groupPolicy: "open",
+        allowFrom: [`discord:${directAgentOwnerId}`],
+        voice: {
+          enabled: true,
+          mode: "agent-proxy",
+          realtime: { provider: "codex", bargeIn: true },
+        },
+      },
+      undefined,
+      { commands: { useAccessGroups: false } },
+    );
+    await manager.join(
+      { guildId: "g1", channelId: "1001" },
+      { requester: { senderId: directAgentOwnerId, senderIsOwner: true } },
+    );
+    const entry = getSessionEntry(manager) as {
+      realtime?: {
+        acceptsSpeaker: (
+          context: { extraSystemPrompt?: string; senderIsOwner: boolean; speakerLabel: string },
+          userId: string,
+        ) => boolean;
+      };
+    };
+    if (!entry.realtime) {
+      throw new Error("expected direct-agent realtime session");
+    }
+    const acceptsSpeaker = vi.spyOn(entry.realtime, "acceptsSpeaker");
+    const player = getLastAudioPlayer();
+    player.state.status = "playing";
+    const bridgeParams = lastRealtimeBridgeParams() as
+      | { audioSink?: { sendAudio: (audio: Buffer) => void } }
+      | undefined;
+    bridgeParams?.audioSink?.sendAudio(Buffer.alloc(480));
+
+    await (
+      manager as unknown as {
+        handleSpeakingStart: (entry: unknown, userId: string) => Promise<void>;
+      }
+    ).handleSpeakingStart(entry, "u-guest");
+
+    expect(acceptsSpeaker).toHaveBeenCalledWith(
+      expect.objectContaining({ senderIsOwner: false }),
+      "u-guest",
+    );
+    expect(realtimeSessionMock.handleBargeIn).not.toHaveBeenCalled();
+    expect(connection.receiver.subscribe).not.toHaveBeenCalled();
   });
 
   it("interrupts realtime playback when an already-active speaker keeps talking", async () => {

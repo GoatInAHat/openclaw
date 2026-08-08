@@ -3881,6 +3881,7 @@ async function runEmbeddedAgentInternal(
                 ? [silentToolResultReplyPayload]
                 : payloadsWithToolMedia;
           const payloadCount = payloadsForTerminalPath?.length ?? 0;
+          const isRealtimeVoiceOperation = params.realtimeVoice !== undefined;
           const emptyAssistantReplyIsSilent = shouldTreatEmptyAssistantReplyAsSilent({
             allowEmptyAssistantReplyAsSilent: params.allowEmptyAssistantReplyAsSilent,
             payloadCount,
@@ -3888,29 +3889,31 @@ async function runEmbeddedAgentInternal(
             timedOut,
             attempt,
           });
-          const nextReasoningOnlyRetryInstruction = emptyAssistantReplyIsSilent
-            ? null
-            : resolveReasoningOnlyRetryInstruction({
-                provider: activeErrorContext.provider,
-                modelId: activeErrorContext.model,
-                modelApi: effectiveModel.api,
-                executionContract,
-                aborted,
-                timedOut,
-                attempt,
-              });
-          const nextEmptyResponseRetryInstruction = emptyAssistantReplyIsSilent
-            ? null
-            : resolveEmptyResponseRetryInstruction({
-                provider: activeErrorContext.provider,
-                modelId: activeErrorContext.model,
-                modelApi: effectiveModel.api,
-                executionContract,
-                payloadCount,
-                aborted,
-                timedOut,
-                attempt,
-              });
+          const nextReasoningOnlyRetryInstruction =
+            isRealtimeVoiceOperation || emptyAssistantReplyIsSilent
+              ? null
+              : resolveReasoningOnlyRetryInstruction({
+                  provider: activeErrorContext.provider,
+                  modelId: activeErrorContext.model,
+                  modelApi: effectiveModel.api,
+                  executionContract,
+                  aborted,
+                  timedOut,
+                  attempt,
+                });
+          const nextEmptyResponseRetryInstruction =
+            isRealtimeVoiceOperation || emptyAssistantReplyIsSilent
+              ? null
+              : resolveEmptyResponseRetryInstruction({
+                  provider: activeErrorContext.provider,
+                  modelId: activeErrorContext.model,
+                  modelApi: effectiveModel.api,
+                  executionContract,
+                  payloadCount,
+                  aborted,
+                  timedOut,
+                  attempt,
+                });
           if (
             nextReasoningOnlyRetryInstruction &&
             reasoningOnlyRetryAttempts < maxReasoningOnlyRetryAttempts
@@ -3928,6 +3931,7 @@ async function runEmbeddedAgentInternal(
             nextReasoningOnlyRetryInstruction &&
             reasoningOnlyRetryAttempts >= maxReasoningOnlyRetryAttempts;
           if (
+            !isRealtimeVoiceOperation &&
             !emptyAssistantReplyIsSilent &&
             shouldRetryMissingAssistantTurn({
               payloadCount,
@@ -3959,15 +3963,16 @@ async function runEmbeddedAgentInternal(
             );
             continue;
           }
-          const incompleteTurnText = emptyAssistantReplyIsSilent
-            ? null
-            : resolveIncompleteTurnPayloadText({
-                payloadCount,
-                aborted,
-                externalAbort,
-                timedOut,
-                attempt,
-              });
+          const incompleteTurnText =
+            isRealtimeVoiceOperation || emptyAssistantReplyIsSilent
+              ? null
+              : resolveIncompleteTurnPayloadText({
+                  payloadCount,
+                  aborted,
+                  externalAbort,
+                  timedOut,
+                  attempt,
+                });
           const incompleteTurnFallbackSafe = Boolean(
             incompleteTurnText &&
             !aborted &&
@@ -3981,6 +3986,7 @@ async function runEmbeddedAgentInternal(
             ? readAttemptTerminalToolPresentation()
             : undefined;
           if (
+            !isRealtimeVoiceOperation &&
             !emptyAssistantReplyIsSilent &&
             attemptCompactionCount > 0 &&
             payloadCount === 0 &&
@@ -4171,6 +4177,7 @@ async function runEmbeddedAgentInternal(
 
           const beforeAgentFinalizeRevisionReason = attempt.beforeAgentFinalizeRevisionReason;
           const shouldHonorBeforeAgentFinalizeRevision =
+            !isRealtimeVoiceOperation &&
             !aborted &&
             !promptError &&
             !timedOut &&

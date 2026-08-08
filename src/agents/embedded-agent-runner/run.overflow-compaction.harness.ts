@@ -309,6 +309,7 @@ export function resetRunOverflowCompactionHarnessMocks(): void {
         ? { supported: true, priority: 100 }
         : { supported: false },
     runAttempt: async (params) => await mockedRunEmbeddedAttempt(params),
+    runRealtimeVoiceSession: async (params) => await mockedRunEmbeddedAttempt(params),
   });
 
   mockedGlobalHookRunner.hasHooks.mockReset();
