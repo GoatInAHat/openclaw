@@ -7,12 +7,16 @@ import { describe, expect, it, vi } from "vitest";
 
 const completeWithPreparedSimpleCompletionModel = vi.hoisted(() => vi.fn());
 const runCodexIsolatedCompletion = vi.hoisted(() => vi.fn());
+const runCodexAppServerNativeSession = vi.hoisted(() => vi.fn());
 
 vi.mock("openclaw/plugin-sdk/simple-completion-runtime", () => ({
   completeWithPreparedSimpleCompletionModel,
 }));
 vi.mock("./src/app-server/isolated-completion.js", () => ({
   runCodexIsolatedCompletion,
+}));
+vi.mock("./src/app-server/native-session-attempt.js", () => ({
+  runCodexAppServerNativeSession,
 }));
 
 import { createCodexAppServerAgentHarness } from "./harness.js";
@@ -32,6 +36,21 @@ describe("Codex agent harness supports()", () => {
     expect(
       (harness as typeof harness & { cloudPlacement?: { mode: "remote-exec" } }).cloudPlacement,
     ).toEqual({ mode: "remote-exec" });
+  });
+
+  it("routes a prepared native session through the Codex app-server owner", async () => {
+    const result = { terminal: { kind: "ok" } };
+    runCodexAppServerNativeSession.mockResolvedValueOnce(result);
+    const params = {
+      nativeRealtimeSession: { run: vi.fn() },
+    } as unknown as Parameters<typeof harness.runAttempt>[0];
+
+    await expect(harness.runAttempt(params)).resolves.toBe(result);
+    expect(runCodexAppServerNativeSession).toHaveBeenCalledWith(params, {
+      bindingStore: testCodexAppServerBindingStore,
+      pluginConfig: undefined,
+      nativeHookRelay: { enabled: true },
+    });
   });
 
   it("keeps computer-control denies out of the native-surface exemption", () => {

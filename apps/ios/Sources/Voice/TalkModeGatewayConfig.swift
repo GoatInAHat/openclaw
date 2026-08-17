@@ -472,7 +472,7 @@ enum TalkModeGatewayConfigParser {
         guard mode == "realtime" else {
             return .native
         }
-        if brain != nil, brain != "agent-consult" {
+        if brain != nil, brain != "agent-consult", brain != "codex-realtime" {
             return .native
         }
         if requiresGatewayRealtimeTransport {

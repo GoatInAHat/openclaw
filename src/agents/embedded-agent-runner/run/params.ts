@@ -68,6 +68,25 @@ export type ResolvedToolPromptFinalizer = (params: {
   messageToolAvailable: boolean;
 }) => string;
 
+/** Provider-neutral local side channel opened inside a prepared native harness session. */
+export type AgentHarnessNativeSession = {
+  runtime: string;
+  threadId: string;
+  signal: AbortSignal;
+  request: <T = unknown>(
+    method: string,
+    params?: unknown,
+    options?: { timeoutMs?: number; signal?: AbortSignal },
+  ) => Promise<T>;
+  onNotification: (
+    listener: (notification: { method: string; params?: unknown }) => void | Promise<void>,
+  ) => () => void;
+};
+
+export type AgentHarnessNativeRealtimeSessionOperation = {
+  run: (session: AgentHarnessNativeSession) => Promise<void>;
+};
+
 type ReasoningStreamPayload = Pick<
   ReplyPayload,
   "text" | "mediaUrls" | "isReasoning" | "isReasoningSnapshot"
@@ -222,6 +241,8 @@ export type RunEmbeddedAgentParams = {
   toolOverrides?: SessionToolOverrides;
   skillsSnapshot?: SkillSnapshot;
   prompt: string;
+  /** Long-running realtime operation hosted by the selected native harness. */
+  nativeRealtimeSession?: AgentHarnessNativeRealtimeSessionOperation;
   /** User-visible prompt body to submit and persist; runtime context travels separately. */
   transcriptPrompt?: string;
   /** Finalizes caller-owned guidance after the submitted tool surface is known. */

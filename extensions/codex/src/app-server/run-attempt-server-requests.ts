@@ -39,6 +39,7 @@ export function createCodexAttemptServerRequestController(
   resources: CodexAttemptResources,
   turnRuntime: CodexAttemptTurnState,
   lifecycle: CodexAttemptLifecycleController,
+  options: { trackTurnActivity?: boolean } = {},
 ) {
   const { prompt, state: resourceState, projectorRef, trajectoryRecorder } = resources;
   const { context } = prompt;
@@ -77,9 +78,14 @@ export function createCodexAttemptServerRequestController(
     let armCompletionWatchOnResponse = false;
     let requestCountsAsTurnActivity = false;
     let requestKeepsAttemptWatchArmed = false;
-    const markCurrentTurnRequestProgress = (options?: { hasIndependentTimeout?: boolean }) => {
+    const markCurrentTurnRequestProgress = (requestOptions?: {
+      hasIndependentTimeout?: boolean;
+    }) => {
+      if (options.trackTurnActivity === false) {
+        return;
+      }
       state.activeAppServerTurnRequests += 1;
-      requestKeepsAttemptWatchArmed = options?.hasIndependentTimeout !== true;
+      requestKeepsAttemptWatchArmed = requestOptions?.hasIndependentTimeout !== true;
       if (requestKeepsAttemptWatchArmed) {
         state.activeAppServerTurnRequestsWithoutTimeout += 1;
       }
@@ -369,7 +375,7 @@ export function createCodexAttemptServerRequestController(
           turnWatches.armCompletionIdleWatch({ timeoutMs: postToolContinuationTimeoutMs });
         }
         scheduleTerminalDynamicToolReleaseCheck();
-      } else {
+      } else if (options.trackTurnActivity !== false) {
         turnWatches.scheduleProgressWatches();
       }
     }

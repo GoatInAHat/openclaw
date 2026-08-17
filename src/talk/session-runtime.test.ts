@@ -122,6 +122,57 @@ describe("realtime voice bridge session runtime", () => {
     );
   });
 
+  it("lets a provider-owned native turn bypass transcript consultation", async () => {
+    let request: Parameters<RealtimeVoiceProviderPlugin["createBridge"]>[0] | undefined;
+    const onTranscript = vi.fn();
+    const provider: RealtimeVoiceProviderPlugin = {
+      id: "native",
+      label: "Native",
+      capabilities: {
+        transports: ["gateway-relay"],
+        inputAudioFormats: [REALTIME_VOICE_AUDIO_FORMAT_PCM16_24KHZ],
+        outputAudioFormats: [REALTIME_VOICE_AUDIO_FORMAT_PCM16_24KHZ],
+        brain: "codex-realtime",
+        handlesAgentConsult: true,
+      },
+      isConfigured: () => true,
+      createBridge: (nextRequest) => {
+        request = nextRequest;
+        return makeBridge();
+      },
+    };
+
+    createRealtimeVoiceBridgeSession({
+      provider,
+      sessionKey: "agent:main:voice:test",
+      providerConfig: {},
+      autoRespondToAudio: false,
+      tools: [
+        {
+          type: "function",
+          name: "legacy",
+          description: "",
+          parameters: { type: "object", properties: {} },
+        },
+      ],
+      audioSink: { sendAudio: vi.fn() },
+      onTranscript,
+    });
+
+    const callbacks = expectBridgeRequest(request);
+    callbacks.onTranscript?.("user", "do not consult again", true);
+    callbacks.onTranscript?.("assistant", "native answer", true);
+
+    expect(callbacks).toMatchObject({
+      sessionKey: "agent:main:voice:test",
+      autoRespondToAudio: true,
+      tools: [],
+    });
+    expect(onTranscript).toHaveBeenCalledTimes(2);
+    expect(onTranscript).toHaveBeenNthCalledWith(1, "user", "do not consult again", true);
+    expect(onTranscript).toHaveBeenNthCalledWith(2, "assistant", "native answer", true);
+  });
+
   it("passes the host-selected agent to the provider bridge", () => {
     let request: Parameters<RealtimeVoiceProviderPlugin["createBridge"]>[0] | undefined;
     const provider: RealtimeVoiceProviderPlugin = {
@@ -242,7 +293,7 @@ describe("realtime voice bridge session runtime", () => {
     expect(bridge["acknowledgeMark"]).not.toHaveBeenCalled();
   });
 
-  it("passes tool calls the active session and triggers initial greeting on ready", () => {
+  it("passes tool calls the active session and triggers the initial greeting only once", () => {
     let callbacks: Parameters<RealtimeVoiceProviderPlugin["createBridge"]>[0] | undefined;
     const bridge = makeBridge();
     const provider: RealtimeVoiceProviderPlugin = {
@@ -272,9 +323,10 @@ describe("realtime voice bridge session runtime", () => {
     };
 
     callbacks?.onReady?.();
+    callbacks?.onReady?.();
     callbacks?.onToolCall?.(event);
 
-    expect(bridge["triggerGreeting"]).toHaveBeenCalledWith("Say hello");
+    expect(bridge["triggerGreeting"]).toHaveBeenCalledExactlyOnceWith("Say hello");
     expect(onToolCall).toHaveBeenCalledWith(event, session);
   });
 

@@ -234,6 +234,15 @@ export function createCodexAppServerAgentHarness(
     runAttempt: async (params) => {
       // Keep app-server runtime code behind lazy imports so plugin discovery and
       // cold provider catalog reads do not pull in the whole Codex runtime.
+      if (params.nativeRealtimeSession) {
+        const { runCodexAppServerNativeSession } =
+          await import("./src/app-server/native-session-attempt.js");
+        return runCodexAppServerNativeSession(params, {
+          bindingStore: options.bindingStore,
+          pluginConfig: options?.resolvePluginConfig?.() ?? options?.pluginConfig,
+          nativeHookRelay: { enabled: true },
+        });
+      }
       const { runCodexAppServerAttempt } = await import("./src/app-server/run-attempt.js");
       return runCodexAppServerAttempt(params, {
         bindingStore: options.bindingStore,

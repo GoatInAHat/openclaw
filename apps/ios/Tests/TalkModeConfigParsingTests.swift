@@ -734,6 +734,16 @@ struct TalkModeManagerTests {
         #expect(parsed.executionMode == .native)
     }
 
+    @Test func `keeps Codex realtime brain on gateway relay`() {
+        let parsed = Self.parseRealtime(
+            provider: "codex",
+            mode: "realtime",
+            transport: "gateway-relay",
+            brain: "codex-realtime")
+
+        #expect(parsed.executionMode == .realtimeRelay)
+    }
+
     @Test func `keeps non open AI realtime default transport on gateway relay`() {
         let parsed = Self.parseRealtime(
             provider: "google",

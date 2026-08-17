@@ -12,6 +12,7 @@ import type {
 } from "../talk/provider-types.js";
 import type { RealtimeVoiceSessionHarness } from "../talk/realtime-session-harness.js";
 import type { RealtimeVoiceBridgeSession } from "../talk/session-runtime.js";
+import type { TalkBrain } from "../talk/talk-events.js";
 import type { TalkEvent } from "../talk/talk-session-controller.js";
 import type { GatewayRequestContext } from "./server-methods/shared-types.js";
 import type { RelayToolCallLedger } from "./talk-realtime-relay-tool-call-ledger.js";
@@ -124,6 +125,7 @@ export type CreateTalkRealtimeRelaySessionParams = {
   cfg?: OpenClawConfig;
   provider: RealtimeVoiceProviderPlugin;
   providerConfig: RealtimeVoiceProviderConfig;
+  brain?: TalkBrain;
   instructions: string;
   tools: RealtimeVoiceTool[];
   model?: string;

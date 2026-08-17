@@ -1004,6 +1004,65 @@ describe("RealtimeCallHandler path routing", () => {
     }
   });
 
+  it("records Codex-native transcripts without starting a second agent turn", async () => {
+    let callbacks: RealtimeBridgeRequest | undefined;
+    const processEvent = vi.fn();
+    const call = makeCallRecord("CA-codex-native");
+    const createBridge = vi.fn((request: RealtimeBridgeRequest) => {
+      callbacks = request;
+      return makeBridge();
+    });
+    const handler = makeHandler(undefined, {
+      manager: {
+        processEvent,
+        getCallByProviderCallId: vi.fn((): CallRecord => call),
+      },
+      realtimeProvider: makeRealtimeProvider(createBridge, {
+        id: "codex",
+        capabilities: {
+          ...PROVIDER_BARGE_IN_CAPABILITIES,
+          brain: "codex-realtime",
+          handlesAgentConsult: true,
+        },
+      }),
+    });
+    const server = await startRealtimeServer(handler);
+
+    try {
+      const ws = await connectWs(server.url);
+      try {
+        ws.send(
+          JSON.stringify({
+            event: "start",
+            start: { streamSid: "MZ-codex-native", callSid: "CA-codex-native" },
+          }),
+        );
+        await waitForRealtimeTest(() => expect(createBridge).toHaveBeenCalled());
+
+        callbacks?.onTranscript?.("user", "use the native session", true);
+        callbacks?.onTranscript?.("assistant", "done natively", true);
+
+        expect(recentTalkEvents(call).some((event) => event.type === "transcript.done")).toBe(true);
+        expect(
+          processEvent.mock.calls
+            .map(([event]) => event as NormalizedEvent)
+            .some((event) => event.type === "call.speech"),
+        ).toBe(false);
+        expect(
+          processEvent.mock.calls
+            .map(([event]) => event as NormalizedEvent)
+            .some((event) => event.type === "call.assistant-speech"),
+        ).toBe(true);
+      } finally {
+        if (ws.readyState !== WebSocket.CLOSED && ws.readyState !== WebSocket.CLOSING) {
+          ws.close();
+        }
+      }
+    } finally {
+      await server.close();
+    }
+  });
+
   it("cancels the active turn when the provider confirms barge-in", async () => {
     await withBargeInHarness(
       { providerCallId: "CA-barge-in", handlesProviderBargeIn: true },

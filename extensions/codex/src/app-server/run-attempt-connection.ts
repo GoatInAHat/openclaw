@@ -21,6 +21,7 @@ import {
 import { resolveCodexBindingAppServerConnection } from "./binding-connection.js";
 import {
   canUseCodexModelBackedApprovalsReviewerForModel,
+  enableCodexRealtimeConversation,
   isCodexRemoteExecPlacementSandbox,
   readCodexPluginConfig,
   readCodexRequirementsToml,
@@ -180,8 +181,8 @@ export async function prepareCodexAttemptConnection({ params, options }: CodexRu
   const resolveRuntimeOptionsForBinding = (
     binding: CodexAppServerThreadBinding | undefined,
     selection: { modelProvider?: string; model?: string },
-  ) =>
-    resolveCodexBindingAppServerConnection({
+  ) => {
+    const resolved = resolveCodexBindingAppServerConnection({
       binding,
       pluginConfig,
       execPolicy,
@@ -193,6 +194,8 @@ export async function prepareCodexAttemptConnection({ params, options }: CodexRu
       openClawSandboxActive: sandbox?.enabled === true,
       sessionPermissionMode: params.permissionMode,
     }).appServer;
+    return params.nativeRealtimeSession ? enableCodexRealtimeConversation(resolved) : resolved;
+  };
   const initialStartupBindingHadInactiveThreadBootstrap =
     isInactiveThreadBootstrapBinding(startupBinding);
   const preparedAuthRoute = usesSupervisionConnection

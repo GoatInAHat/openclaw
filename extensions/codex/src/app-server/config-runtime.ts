@@ -330,6 +330,28 @@ export function resolveCodexAppServerRuntimeOptions(
   };
 }
 
+/** Enables subscription-backed realtime on a prepared local Codex app-server. */
+export function enableCodexRealtimeConversation(
+  options: CodexAppServerRuntimeOptions,
+): CodexAppServerRuntimeOptions {
+  if (options.start.transport !== "stdio") {
+    throw new Error("Codex realtime requires appServer.transport=stdio");
+  }
+  const featureEnabled = options.start.args.some(
+    (arg, index) => arg === "--enable" && options.start.args[index + 1] === "realtime_conversation",
+  );
+  const args = featureEnabled
+    ? options.start.args
+    : [...options.start.args, "--enable", "realtime_conversation"];
+  const clearEnv = [
+    ...new Set([...(options.start.clearEnv ?? []), "CODEX_API_KEY", "OPENAI_API_KEY"]),
+  ];
+  return {
+    ...options,
+    start: { ...options.start, args, clearEnv },
+  };
+}
+
 /**
  * Rechecks Codex-owned plugin state at the final spawn boundary, where the
  * effective agent home is known, so Computer Use keeps the desktop app's TCC ownership.

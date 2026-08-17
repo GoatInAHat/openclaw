@@ -3,6 +3,7 @@ import type { OpenClawConfig } from "../config/types.openclaw.js";
 import type { RealtimeVoiceProviderPlugin } from "../plugins/types.js";
 import type {
   RealtimeVoiceBridge,
+  RealtimeVoiceAgentEvent,
   RealtimeVoiceAudioClearReason,
   RealtimeVoiceAudioFormat,
   RealtimeVoiceBargeInOptions,
@@ -59,6 +60,7 @@ export type RealtimeVoiceBridgeSessionParams = {
   cfg?: OpenClawConfig;
   /** Host-selected agent scope for provider auth and agent-owned bridge state. */
   agentId?: string;
+  sessionKey?: string;
   providerConfig: RealtimeVoiceProviderConfig;
   audioFormat?: RealtimeVoiceAudioFormat;
   audioSink: RealtimeVoiceAudioSink;
@@ -71,6 +73,7 @@ export type RealtimeVoiceBridgeSessionParams = {
   triggerGreetingOnReady?: boolean;
   tools?: RealtimeVoiceTool[];
   onTranscript?: (role: RealtimeVoiceRole, text: string, isFinal: boolean) => void;
+  onAgentEvent?: (event: RealtimeVoiceAgentEvent) => void | Promise<void>;
   onEvent?: (event: RealtimeVoiceBridgeEvent) => void;
   onResponseDone?: (outcome: RealtimeVoiceResponseOutcome) => void;
   onToolCall?: (
@@ -90,12 +93,14 @@ type RealtimeVoiceSessionPhase = "admitting" | "provider-terminal" | "disposed";
 export function createRealtimeVoiceBridgeSession(
   params: RealtimeVoiceBridgeSessionParams,
 ): RealtimeVoiceBridgeSession {
+  const providerOwnsTurns = params.provider.capabilities?.handlesAgentConsult === true;
   const bridgeRef: { current?: RealtimeVoiceBridge } = {};
   // Local disposal owns provider cleanup. Only a terminal callback fired before bridge
   // adoption may reopen; adopted bridges own reconnects and stale-event fencing internally.
   let phase: RealtimeVoiceSessionPhase = "admitting";
   let terminalBeforeBridgeAdoption = false;
   let closeReported = false;
+  let greetingTriggered = false;
   const isAdmitting = () => phase === "admitting";
   const requireBridge = () => {
     if (!bridgeRef.current) {
@@ -167,13 +172,14 @@ export function createRealtimeVoiceBridgeSession(
   const bridge = params.provider.createBridge({
     cfg: params.cfg,
     agentId: params.agentId,
+    sessionKey: params.sessionKey,
     providerConfig: params.providerConfig,
     audioFormat: params.audioFormat,
     instructions: params.instructions,
     language: params.language,
-    autoRespondToAudio: params.autoRespondToAudio,
+    autoRespondToAudio: providerOwnsTurns ? true : params.autoRespondToAudio,
     interruptResponseOnInputAudio: params.interruptResponseOnInputAudio,
-    tools: params.tools,
+    tools: providerOwnsTurns ? [] : params.tools,
     onAudio: (audio) => {
       if (canSendAudio()) {
         params.audioSink.sendAudio(audio);
@@ -199,6 +205,19 @@ export function createRealtimeVoiceBridgeSession(
       }
     },
     onTranscript: params.onTranscript,
+    onAgentEvent: (event) => {
+      if (!isAdmitting()) {
+        return;
+      }
+      try {
+        const pending = params.onAgentEvent?.(event);
+        if (pending) {
+          void pending.catch(reportCallbackError);
+        }
+      } catch (error) {
+        reportCallbackError(error);
+      }
+    },
     onEvent: params.onEvent,
     onResponseDone: params.onResponseDone,
     onToolCall: (event) => {
@@ -218,7 +237,8 @@ export function createRealtimeVoiceBridgeSession(
       if (!bridgeRef.current || !isAdmitting()) {
         return;
       }
-      if (params.triggerGreetingOnReady) {
+      if (params.triggerGreetingOnReady && !greetingTriggered) {
+        greetingTriggered = true;
         bridgeRef.current.triggerGreeting?.(params.initialGreetingInstructions);
       }
       params.onReady?.(session);

@@ -12,6 +12,7 @@ function createExtensionCodexAppServerAttemptSupportVitestConfig(
       "extensions/codex/src/app-server/attempt-startup.test.ts",
       "extensions/codex/src/app-server/attempt-timeouts.test.ts",
       "extensions/codex/src/app-server/attempt-turn-watches.test.ts",
+      "extensions/codex/src/app-server/native-session-attempt.test.ts",
     ],
     {
       dir: "extensions",

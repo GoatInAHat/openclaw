@@ -1,7 +1,32 @@
 import type { PassThrough } from "node:stream";
 import type { RealtimeVoiceSessionHarness } from "openclaw/plugin-sdk/realtime-voice";
+import { vi as vitest } from "vitest";
 import type { MockCallSource } from "./manager.e2e.test-support.js";
 import { defineDiscordVoiceTests } from "./voice-test-harness.test-support.js";
+
+const outputMocks = vitest.hoisted(() => {
+  const draft = {
+    cleanup: vitest.fn(async () => undefined),
+    draftStream: { clear: vitest.fn(async () => undefined) },
+    flush: vitest.fn(async () => undefined),
+    handleAssistantMessageBoundary: vitest.fn(),
+    markFinalReplyDelivered: vitest.fn(),
+    markFinalReplyStarted: vitest.fn(),
+    pushItemEvent: vitest.fn(async () => undefined),
+    pushToolEvent: vitest.fn(async () => undefined),
+    updateFromPartial: vitest.fn(async () => undefined),
+  };
+  return {
+    createDraft: vitest.fn(() => draft),
+    draft,
+    send: vitest.fn(async () => undefined),
+  };
+});
+
+vitest.mock("../send.js", () => ({ sendMessageDiscord: outputMocks.send }));
+vitest.mock("../monitor/message-handler.draft-preview.js", () => ({
+  createDiscordDraftPreviewController: outputMocks.createDraft,
+}));
 
 defineDiscordVoiceTests(
   ({
@@ -15,6 +40,7 @@ defineDiscordVoiceTests(
     resolveConfiguredRealtimeVoiceProviderMock,
     controlRealtimeVoiceAgentRunMock,
     realtimeSessionMock,
+    createClient,
     createManager,
     createAgentProxyManager,
     getSessionEntry,
@@ -27,6 +53,57 @@ defineDiscordVoiceTests(
     expectUserMessageIncludes,
     expectUserMessageNotIncludes,
   }) => {
+    it("lets provider-native realtime own turns and uses standard Discord output delivery", async () => {
+      resolveConfiguredRealtimeVoiceProviderMock.mockReturnValueOnce({
+        provider: {
+          id: "codex",
+          capabilities: { brain: "codex-realtime", handlesAgentConsult: true },
+        },
+        providerConfig: { voice: "arbor" },
+      } as never);
+      const manager = createManager(
+        {
+          groupPolicy: "open",
+          voice: {
+            enabled: true,
+            mode: "agent-proxy",
+            realtime: { provider: "codex" },
+          },
+        },
+        createClient(),
+      );
+
+      expect((await manager.join({ guildId: "g1", channelId: "1001" })).ok).toBe(true);
+      const bridgeParams = lastRealtimeBridgeParams() as ReturnType<
+        typeof lastRealtimeBridgeParams
+      > & { sessionKey?: string };
+      expect(bridgeParams.sessionKey).toBe("discord:g1:c1");
+      expect(bridgeParams.autoRespondToAudio).toBe(true);
+      expect(bridgeParams.tools).toEqual([]);
+
+      bridgeParams.onTranscript?.("user", "native user transcript", true);
+      bridgeParams.onTranscript?.("assistant", "native partial", false);
+      bridgeParams.onTranscript?.("assistant", "native final", true);
+
+      await bridgeParams.onAgentEvent?.({
+        stream: "tool",
+        data: { phase: "start", name: "exec", toolCallId: "tool-1" },
+      });
+
+      await vi.waitFor(() => expect(outputMocks.send).toHaveBeenCalledOnce());
+      expect(agentCommandMock).not.toHaveBeenCalled();
+      expect(outputMocks.draft.updateFromPartial).toHaveBeenCalledWith("native partial");
+      expect(outputMocks.draft.pushToolEvent).toHaveBeenCalledWith(
+        expect.objectContaining({ name: "exec", phase: "start", toolCallId: "tool-1" }),
+      );
+      expect(outputMocks.send).toHaveBeenCalledWith(
+        "channel:1001",
+        "native final",
+        expect.objectContaining({ accountId: "default" }),
+      );
+      await manager.leave({ guildId: "g1" });
+    });
+
     it("uses agent-proxy realtime voice by default", async () => {
       agentCommandMock.mockResolvedValueOnce({ payloads: [{ text: "agent proxy answer" }] });
       const cfg = { auth: { order: { openai: ["openai:codex-cli"] } } } as never;

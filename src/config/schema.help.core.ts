@@ -214,7 +214,7 @@ export const CORE_FIELD_HELP: Record<string, string> = {
   "talk.realtime.reasoningEffort":
     "Provider-specific reasoning effort for realtime Talk sessions, such as minimal, low, medium, or high.",
   "talk.realtime.brain":
-    "Talk reasoning strategy: agent-consult for Gateway-mediated agent help, direct-tools for local tool calls, or none.",
+    "Talk reasoning strategy: agent-consult for Gateway-mediated agent help, codex-realtime for a Codex app-server-native voice session, direct-tools for local tool calls, or none.",
   "talk.realtime.consultRouting":
     "Gateway relay fallback for final user transcripts when the realtime provider skips openclaw_agent_consult. provider-direct preserves provider replies; force-agent-consult routes through OpenClaw.",
   "talk.consultThinkingLevel":

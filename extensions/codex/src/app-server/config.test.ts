@@ -10,6 +10,7 @@ import {
   canUseCodexModelBackedApprovalsReviewerForModel,
   codexAppServerStartOptionsKey,
   codexSandboxPolicyForTurn,
+  enableCodexRealtimeConversation,
   isCodexSandboxExecServerEnabled,
   readCodexPluginConfig,
   resolveCodexAppServerRuntimeOptions,
@@ -23,6 +24,7 @@ import {
   shouldAutoApproveCodexAppServerApprovals,
   withMcpElicitationsApprovalPolicy,
 } from "./config.js";
+import { resolveCodexAppServerSpawnEnv } from "./transport-stdio.js";
 
 type RuntimeOptionsParams = NonNullable<Parameters<typeof resolveCodexAppServerRuntimeOptions>[0]>;
 
@@ -74,6 +76,34 @@ function expectRuntimePolicy(
 }
 
 describe("Codex app-server config", () => {
+  it("enables native realtime on stdio without inheriting ambient API keys", () => {
+    const base = resolveRuntimeForTest({
+      pluginConfig: { appServer: { clearEnv: ["KEEP_CLEAR"] } },
+    });
+    const enabled = enableCodexRealtimeConversation(base);
+
+    expect(enabled.start.args).toEqual([...base.start.args, "--enable", "realtime_conversation"]);
+    expect(enabled.start.clearEnv).toEqual(["KEEP_CLEAR", "CODEX_API_KEY", "OPENAI_API_KEY"]);
+    const spawnEnv = resolveCodexAppServerSpawnEnv(enabled.start, {
+      KEEP: "yes",
+      CODEX_API_KEY: "ambient-codex",
+      OPENAI_API_KEY: "ambient-openai",
+    });
+    expect(spawnEnv).toMatchObject({ KEEP: "yes" });
+    expect(spawnEnv).not.toHaveProperty("CODEX_API_KEY");
+    expect(spawnEnv).not.toHaveProperty("OPENAI_API_KEY");
+    expect(enableCodexRealtimeConversation(enabled)).toEqual(enabled);
+    expect(() =>
+      enableCodexRealtimeConversation(
+        resolveRuntimeForTest({
+          pluginConfig: {
+            appServer: { transport: "websocket", url: "ws://127.0.0.1:39175" },
+          },
+        }),
+      ),
+    ).toThrow("appServer.transport=stdio");
+  });
+
   it("only auto-approves app-server approvals for full yolo runtime policy", () => {
     expect(
       shouldAutoApproveCodexAppServerApprovals({

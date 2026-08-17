@@ -16,6 +16,7 @@ type PendingWrite = {
 
 async function createEngineFixture(options?: {
   handleToolCall?: (params: MeetingRealtimeToolCallParams) => Promise<void>;
+  codexRealtime?: boolean;
 }) {
   let callbacks: RealtimeVoiceBridgeCreateRequest | undefined;
   let onHumanBargeIn: ((audio: Buffer) => boolean) | undefined;
@@ -34,6 +35,12 @@ async function createEngineFixture(options?: {
   const provider: RealtimeVoiceProviderPlugin = {
     id: "test",
     label: "Test",
+    capabilities: options?.codexRealtime
+      ? ({
+          brain: "codex-realtime",
+          handlesAgentConsult: true,
+        } as RealtimeVoiceProviderPlugin["capabilities"])
+      : undefined,
     isConfigured: () => true,
     createBridge: (request) => {
       callbacks = request;
@@ -66,6 +73,7 @@ async function createEngineFixture(options?: {
       chrome: { audioFormat: "pcm16-24khz" },
       realtime: {
         strategy: "bidi",
+        agentId: "meetings",
         provider: "test",
         providers: { test: {} },
       },
@@ -80,13 +88,16 @@ async function createEngineFixture(options?: {
       warn: vi.fn(),
     },
     meetingSessionId: "meeting-1",
+    requesterSessionKey: "agent:meetings:main",
     platform: {
       displayName: "Test Meeting",
       logScope: "[meeting-test]",
       sessionIdPrefix: "meeting-test",
     },
     providers: [provider],
-    runtime: {} as never,
+    runtime: {
+      agent: { session: { resolveStorePath: vi.fn(() => "/tmp/meeting-sessions.sqlite") } },
+    } as never,
     tools: [],
     transport,
   });
@@ -134,6 +145,22 @@ async function createEngineFixture(options?: {
 }
 
 describe("meeting realtime engine output ownership", () => {
+  it("binds a provider-owned realtime session through the existing meeting session path", async () => {
+    const fixture = await createEngineFixture({ codexRealtime: true });
+    try {
+      expect(fixture.callbacks.agentId).toBe("meetings");
+      expect(fixture.callbacks.sessionKey).toBe("agent:meetings:main");
+      expect(fixture.callbacks.tools).toEqual([]);
+      expect(fixture.callbacks.autoRespondToAudio).toBe(true);
+      fixture.callbacks.onTranscript?.("user", "native transcript", true);
+      expect(fixture.handle.getHealth().recentTalkEvents.map((event) => event.type)).toContain(
+        "transcript.done",
+      );
+    } finally {
+      await fixture.handle.stop();
+    }
+  });
+
   it.each([
     [{ status: "completed" as const, responseId: "response-1" }, "turn.ended"],
     [

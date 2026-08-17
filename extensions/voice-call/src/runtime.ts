@@ -366,11 +366,16 @@ export async function createVoiceCallRuntime(params: {
         cfg,
         agentId,
       });
+      const providerHandlesAgentTurns =
+        resolved.provider.capabilities?.handlesAgentConsult === true;
       return {
         agentId,
+        sessionKey: call.sessionKey,
         provider: resolved.provider,
         providerConfig: resolved.providerConfig,
-        instructions: resolveRealtimeInstructions(call),
+        instructions: providerHandlesAgentTurns
+          ? effectiveConfig.realtime.instructions
+          : resolveRealtimeInstructions(call),
       };
     };
     const realtimeHandler = new RealtimeCallHandler(

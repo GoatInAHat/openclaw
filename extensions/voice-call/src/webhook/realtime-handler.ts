@@ -256,6 +256,7 @@ export type StreamSession = {
 
 type RealtimeCallRegistration = {
   agentId: string;
+  sessionKey?: string;
   instructions: string;
   provider: RealtimeVoiceProviderPlugin;
   providerConfig: RealtimeVoiceProviderConfig;
@@ -701,14 +702,22 @@ export class RealtimeCallHandler {
       type: "call.answered",
       ...baseFields,
     });
-    const { agentId, instructions, provider: realtimeProvider, providerConfig } = registration;
+    const {
+      agentId,
+      instructions,
+      provider: realtimeProvider,
+      providerConfig,
+      sessionKey,
+    } = registration;
+    const providerBrain = realtimeProvider.capabilities?.brain ?? "agent-consult";
+    const providerHandlesAgentTurns = realtimeProvider.capabilities?.handlesAgentConsult === true;
     const initialGreetingInstructions = buildGreetingInstructions(instructions, initialGreeting);
     const harness = createRealtimeVoiceSessionHarness({
       talk: {
         sessionId: `voice-call:${callId}:realtime`,
         mode: "realtime",
         transport: "gateway-relay",
-        brain: "agent-consult",
+        brain: providerBrain,
         provider: realtimeProvider.id,
       },
       talkPayloads: {
@@ -821,6 +830,7 @@ export class RealtimeCallHandler {
       provider: realtimeProvider,
       cfg: this.coreConfig,
       agentId,
+      sessionKey,
       providerConfig,
       interruptResponseOnInputAudio,
       instructions,
@@ -918,21 +928,23 @@ export class RealtimeCallHandler {
             transcript,
             isFinal: true,
           };
-          this.manager.processEvent(event);
-          this.scheduleForcedAgentConsult({
-            harness,
-            session,
-            callId,
-            callSid,
-            transcript,
-            userTranscriptOwner,
-            clearAudio: () => {
-              const clearedBytes = audioPacer.clearAudio();
-              console.log(
-                `[voice-call] realtime forced consult cleared outbound audio callId=${callId} providerCallId=${callSid} queuedBytes=${clearedBytes}`,
-              );
-            },
-          });
+          if (!providerHandlesAgentTurns) {
+            this.manager.processEvent(event);
+            this.scheduleForcedAgentConsult({
+              harness,
+              session,
+              callId,
+              callSid,
+              transcript,
+              userTranscriptOwner,
+              clearAudio: () => {
+                const clearedBytes = audioPacer.clearAudio();
+                console.log(
+                  `[voice-call] realtime forced consult cleared outbound audio callId=${callId} providerCallId=${callSid} queuedBytes=${clearedBytes}`,
+                );
+              },
+            });
+          }
           return;
         }
         this.manager.processEvent({

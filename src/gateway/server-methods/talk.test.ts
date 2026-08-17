@@ -433,7 +433,7 @@ describe("talk.catalog handler", () => {
       {
         modes: ["realtime", "stt-tts", "transcription"],
         transports: ["webrtc", "provider-websocket", "gateway-relay", "managed-room"],
-        brains: ["agent-consult", "direct-tools", "none"],
+        brains: ["agent-consult", "codex-realtime", "direct-tools", "none"],
         speech: {
           activeProvider: "elevenlabs",
           providers: [
@@ -1839,6 +1839,75 @@ describe("talk.session unified handlers", () => {
       connId: "conn-1",
     });
     expect(closeRespond).toHaveBeenCalledWith(true, { ok: true }, undefined);
+  });
+
+  it("routes legacy clients through a configured Codex-native relay", async () => {
+    const provider = {
+      id: "codex",
+      label: "Codex Realtime",
+      capabilities: { brain: "codex-realtime", handlesAgentConsult: true },
+      isConfigured: () => true,
+      createBridge: vi.fn(),
+    };
+    mocks.resolveConfiguredRealtimeVoiceProvider.mockReturnValue({
+      provider,
+      providerConfig: { version: "v3", voice: "arbor" },
+    });
+    mocks.createTalkRealtimeRelaySession.mockReturnValue({
+      provider: "codex",
+      transport: "gateway-relay",
+      relaySessionId: "relay-codex-1",
+      audio: {
+        inputEncoding: "pcm16",
+        inputSampleRateHz: 24000,
+        outputEncoding: "pcm16",
+        outputSampleRateHz: 24000,
+      },
+      expiresAt: 1_797_986_400,
+    });
+
+    const respond = vi.fn();
+    await callTalkHandler("talk.session.create", {
+      params: {
+        sessionKey: "agent:main:main",
+        mode: "realtime",
+        transport: "gateway-relay",
+        brain: "agent-consult",
+        provider: "codex",
+      },
+      respond,
+      context: {
+        getRuntimeConfig: () =>
+          ({
+            talk: {
+              realtime: {
+                brain: "codex-realtime",
+                instructions: "Speak concisely.",
+                providers: { codex: { voice: "arbor" } },
+              },
+            },
+          }) as OpenClawConfig,
+      },
+    });
+
+    expect(mockCallArg(mocks.resolveConfiguredRealtimeVoiceProvider)).toMatchObject({
+      configuredProviderId: "codex",
+      brain: "codex-realtime",
+      surface: "gateway-relay",
+    });
+    expect(mockCallArg(mocks.createTalkRealtimeRelaySession)).toMatchObject({
+      brain: "codex-realtime",
+      instructions: "Speak concisely.",
+      provider,
+      providerConfig: { version: "v3", voice: "arbor" },
+      sessionKey: "agent:main:main",
+      tools: [],
+      forceAgentConsultOnFinalTranscript: false,
+    });
+    expectRespondOk(respond, {
+      relaySessionId: "relay-codex-1",
+      brain: "codex-realtime",
+    });
   });
 
   it("uses talk.agentId for a bare realtime session in an explicit fleet", async () => {

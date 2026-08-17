@@ -37,6 +37,7 @@ export {
 export { readCodexRequirementsToml } from "./config-requirements.js";
 export {
   codexAppServerStartOptionsKey,
+  enableCodexRealtimeConversation,
   codexSandboxPolicyForTurn,
   resolveCodexAppServerHomeScope,
   resolveCodexAppServerRuntimeOptions,

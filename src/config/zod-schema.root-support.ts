@@ -179,7 +179,7 @@ const TalkRealtimeSchema = z
     silenceDurationMs: z.number().int().positive().optional(),
     prefixPaddingMs: z.number().int().nonnegative().optional(),
     reasoningEffort: z.string().min(1).optional(),
-    brain: z.enum(["agent-consult", "direct-tools", "none"]).optional(),
+    brain: z.enum(["agent-consult", "codex-realtime", "direct-tools", "none"]).optional(),
     consultRouting: z.enum(["provider-direct", "force-agent-consult"]).optional(),
   })
   .superRefine((realtime, ctx) => {

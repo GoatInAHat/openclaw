@@ -16,6 +16,18 @@ import {
 } from "./provider-internal.js";
 import { getRealtimeVoiceProvider, listRealtimeVoiceProviders } from "./provider-registry.js";
 import type { RealtimeVoiceProviderConfig } from "./provider-types.js";
+import type { TalkBrain } from "./talk-events.js";
+
+function providerSupportsBrain(
+  provider: RealtimeVoiceProviderPlugin,
+  brain: TalkBrain | undefined,
+): boolean {
+  if (!brain) {
+    return true;
+  }
+  const supportedBrain = provider.capabilities?.brain;
+  return supportedBrain ? supportedBrain === brain : brain !== "codex-realtime";
+}
 
 /** Resolved realtime voice provider plus provider-normalized config. */
 export type ResolvedRealtimeVoiceProvider = {
@@ -26,6 +38,8 @@ export type ResolvedRealtimeVoiceProvider = {
 /** Inputs for resolving a configured or auto-selected realtime voice provider. */
 export type ResolveConfiguredRealtimeVoiceProviderParams = {
   configuredProviderId?: string;
+  /** Brain that an automatically selected provider must support. */
+  brain?: TalkBrain;
   providerConfigs?: Record<string, Record<string, unknown> | undefined>;
   /** Last-mile overrides from a session/client request. */
   providerConfigOverrides?: Record<string, unknown>;
@@ -124,14 +138,18 @@ export function resolveConfiguredRealtimeVoiceProvider(
         rawConfigWithOverrides
       );
     },
-    isProviderConfigured: ({ provider, cfg, providerConfig }) =>
-      isRealtimeVoiceProviderConfigured({
+    isProviderConfigured: ({ provider, cfg, providerConfig }) => {
+      if (!providerSupportsBrain(provider, params.brain)) {
+        return false;
+      }
+      return isRealtimeVoiceProviderConfigured({
         provider,
         cfg,
         providerConfig,
         agentId: params.agentId,
         surface: params.surface,
-      }),
+      });
+    },
   });
 
   if (!resolution.ok && resolution.code === "missing-configured-provider") {
@@ -141,6 +159,16 @@ export function resolveConfiguredRealtimeVoiceProvider(
   }
   if (!resolution.ok && resolution.code === "no-registered-provider") {
     throw new Error(params.noRegisteredProviderMessage ?? "No realtime voice provider registered");
+  }
+  if (
+    !resolution.ok &&
+    resolution.provider &&
+    params.brain &&
+    !providerSupportsBrain(resolution.provider, params.brain)
+  ) {
+    throw new Error(
+      `Realtime voice provider "${resolution.provider.id}" does not support brain="${params.brain}"`,
+    );
   }
   if (!resolution.ok) {
     throw new Error(`Realtime voice provider "${resolution.provider?.id}" is not configured`);

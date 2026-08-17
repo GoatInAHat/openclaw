@@ -77,6 +77,59 @@ describe("realtime voice provider resolver", () => {
     });
   });
 
+  it("skips providers that do not support the selected brain", () => {
+    const codex: RealtimeVoiceProviderPlugin = {
+      id: "codex",
+      label: "Codex",
+      autoSelectOrder: 1,
+      capabilities: {
+        transports: ["gateway-relay"],
+        brain: "codex-realtime",
+        inputAudioFormats: [],
+        outputAudioFormats: [],
+      },
+      isConfigured: () => true,
+      createBridge: () => {
+        throw new Error("unused");
+      },
+    };
+    const consult: RealtimeVoiceProviderPlugin = {
+      id: "consult",
+      label: "Consult",
+      autoSelectOrder: 2,
+      capabilities: {
+        transports: ["gateway-relay"],
+        brain: "agent-consult",
+        inputAudioFormats: [],
+        outputAudioFormats: [],
+      },
+      isConfigured: () => true,
+      createBridge: () => {
+        throw new Error("unused");
+      },
+    };
+
+    expect(
+      resolveConfiguredRealtimeVoiceProvider({
+        brain: "agent-consult",
+        providers: [codex, consult],
+      }).provider.id,
+    ).toBe("consult");
+    expect(
+      resolveConfiguredRealtimeVoiceProvider({
+        brain: "codex-realtime",
+        providers: [codex, consult],
+      }).provider.id,
+    ).toBe("codex");
+    expect(() =>
+      resolveConfiguredRealtimeVoiceProvider({
+        brain: "agent-consult",
+        configuredProviderId: "codex",
+        providers: [codex, consult],
+      }),
+    ).toThrow('Realtime voice provider "codex" does not support brain="agent-consult"');
+  });
+
   it("passes the host-selected agent to public provider readiness", () => {
     const isConfigured = vi.fn(({ agentId }) => agentId === "molty");
     const provider: RealtimeVoiceProviderPlugin = {

@@ -258,6 +258,7 @@ function buildTalkCatalog(config: OpenClawConfig) {
       resolveConfiguredRealtimeVoiceProvider({
         cfg: config,
         configuredProviderId: realtimeConfig.provider,
+        brain: realtimeConfig.brain,
         providerConfigs: realtimeConfig.providers,
         ...realtimeModelOverride,
         agentId: realtimeAgentId,
@@ -270,7 +271,7 @@ function buildTalkCatalog(config: OpenClawConfig) {
   return {
     modes: ["realtime", "stt-tts", "transcription"],
     transports: ["webrtc", "provider-websocket", "gateway-relay", "managed-room"],
-    brains: ["agent-consult", "direct-tools", "none"],
+    brains: ["agent-consult", "codex-realtime", "direct-tools", "none"],
     speech: {
       ...(activeSpeechProvider ? { activeProvider: activeSpeechProvider } : {}),
       providers: listSpeechProviders(config).map((provider) => {
@@ -381,9 +382,10 @@ function buildTalkCatalog(config: OpenClawConfig) {
           ),
           modes: ["realtime"],
           brains:
-            capabilities?.supportsToolCalls === false && capabilities.handlesAgentConsult !== true
+            (capabilities?.brain ? [capabilities.brain] : undefined) ??
+            (capabilities?.supportsToolCalls === false && capabilities.handlesAgentConsult !== true
               ? ["none"]
-              : ["agent-consult"],
+              : ["agent-consult"]),
           supportsBrowserSession: Boolean(
             capabilities?.supportsBrowserSession ?? provider.createBrowserSession,
           ),

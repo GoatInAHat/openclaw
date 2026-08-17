@@ -320,6 +320,7 @@ export async function dispatchEmbeddedRunAttempt(input: {
       : { authoredContextTokenCap: runtime.authoredContextTokenCap }),
     skillsSnapshot: params.skillsSnapshot,
     prompt: pluginHarnessPrompt ?? preparedExecApprovalContinuation.prompt,
+    nativeRealtimeSession: params.nativeRealtimeSession,
     transcriptPrompt:
       pluginHarnessPrompt !== undefined && params.transcriptPrompt === undefined
         ? preparedExecApprovalContinuation.prompt

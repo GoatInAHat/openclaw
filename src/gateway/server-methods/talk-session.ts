@@ -134,7 +134,7 @@ export const talkSessionHandlers: GatewayRequestHandlers = {
 
     const mode = normalizeTalkSessionMode(params);
     const transport = normalizeTalkSessionTransport({ mode, transport: params.transport });
-    const brain = normalizeTalkSessionBrain({ mode, brain: params.brain });
+    let brain = normalizeTalkSessionBrain({ mode, brain: params.brain });
 
     if (transport === "webrtc" || transport === "provider-websocket") {
       respondInvalidRequest(
@@ -231,14 +231,32 @@ export const talkSessionHandlers: GatewayRequestHandlers = {
       }
 
       if (mode === "realtime") {
-        if (transport !== "gateway-relay" || brain !== "agent-consult") {
-          return respondInvalidRequest(
-            respond,
-            `realtime talk.session.create requires transport="gateway-relay" and brain="agent-consult"`,
-          );
-        }
         const runtimeConfig = context.getRuntimeConfig();
         const realtimeConfig = buildTalkRealtimeConfig(runtimeConfig, params.provider);
+        const configuredBrain =
+          realtimeConfig.brain === "agent-consult" || realtimeConfig.brain === "codex-realtime"
+            ? realtimeConfig.brain
+            : undefined;
+        const explicitProvider = normalizeOptionalLowercaseString(params.provider);
+        const configuredProvider = normalizeOptionalLowercaseString(realtimeConfig.provider);
+        if (
+          configuredBrain &&
+          (params.brain === undefined ||
+            (params.brain === "agent-consult" &&
+              (!explicitProvider || explicitProvider === configuredProvider)))
+        ) {
+          brain = configuredBrain;
+        }
+        if (
+          transport !== "gateway-relay" ||
+          (brain !== "agent-consult" && brain !== "codex-realtime")
+        ) {
+          return respondInvalidRequest(
+            respond,
+            'realtime talk.session.create requires transport="gateway-relay" and brain="agent-consult" or "codex-realtime"',
+          );
+        }
+        const requestedProvider = explicitProvider ?? configuredProvider;
         const launchOptions = buildRealtimeVoiceLaunchOptions({
           requested: params,
           defaults: realtimeConfig,
@@ -260,7 +278,8 @@ export const talkSessionHandlers: GatewayRequestHandlers = {
           bareTalkAgentId ??
           resolveTalkSessionAgentId(runtimeConfig, requestedSessionKey);
         const resolution = resolveConfiguredRealtimeVoiceProvider({
-          configuredProviderId: realtimeConfig.provider,
+          configuredProviderId: requestedProvider,
+          brain,
           providerConfigs: realtimeConfig.providers,
           providerConfigOverrides: launchOptions.model ? { model: launchOptions.model } : {},
           cfg: runtimeConfig,
@@ -268,6 +287,8 @@ export const talkSessionHandlers: GatewayRequestHandlers = {
           defaultModel: realtimeConfig.model,
           surface: "gateway-relay",
         });
+        const providerHandlesAgentTurns =
+          resolution.provider.capabilities?.handlesAgentConsult === true;
         const relayLaunch = resolveTalkRealtimeGatewayRelayLaunch({
           ...resolution,
           cfg: runtimeConfig,
@@ -299,13 +320,19 @@ export const talkSessionHandlers: GatewayRequestHandlers = {
           cfg: runtimeConfig,
           provider: resolution.provider,
           providerConfig: relayLaunch.providerConfig,
-          instructions: buildRealtimeInstructions(realtimeContext.instructions),
-          tools: [REALTIME_VOICE_AGENT_CONSULT_TOOL, REALTIME_VOICE_AGENT_CONTROL_TOOL],
+          brain,
+          instructions: providerHandlesAgentTurns
+            ? realtimeContext.instructions
+            : buildRealtimeInstructions(realtimeContext.instructions),
+          tools: providerHandlesAgentTurns
+            ? []
+            : [REALTIME_VOICE_AGENT_CONSULT_TOOL, REALTIME_VOICE_AGENT_CONTROL_TOOL],
           model: launchOptions.model,
           sessionKey,
           voice: launchOptions.voice,
           language: normalizeOptionalLowercaseString(params.language),
-          forceAgentConsultOnFinalTranscript: relayLaunch.forceAgentConsultOnFinalTranscript,
+          forceAgentConsultOnFinalTranscript:
+            !providerHandlesAgentTurns && relayLaunch.forceAgentConsultOnFinalTranscript,
         });
         rememberUnifiedTalkSession(session.relaySessionId, {
           kind: "realtime-relay",

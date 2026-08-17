@@ -83,7 +83,7 @@ export function createTalkRealtimeRelaySession(
       sessionId: relaySessionId,
       mode: "realtime",
       transport: "gateway-relay",
-      brain: "agent-consult",
+      brain: params.brain ?? "agent-consult",
       provider: params.provider.id,
       // Keep the pre-harness steering window; other harness consumers use the shared default.
       maxRecentEvents: 20,
@@ -202,6 +202,7 @@ export function createTalkRealtimeRelaySession(
     provider: relayProvider,
     cfg: params.cfg,
     agentId: relayAgentId,
+    sessionKey: relaySessionKey,
     providerConfig: params.providerConfig,
     audioFormat: REALTIME_VOICE_AUDIO_FORMAT_PCM16_24KHZ,
     instructions: params.instructions,

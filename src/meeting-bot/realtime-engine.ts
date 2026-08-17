@@ -390,6 +390,10 @@ export async function startMeetingRealtimeEngine(params: {
     providers: params.providers,
   });
   const strategy = params.config.realtime.strategy;
+  const providerBrain =
+    resolved.provider.capabilities?.brain ??
+    (strategy === "bidi" ? "direct-tools" : "agent-consult");
+  const providerHandlesAgentTurns = resolved.provider.capabilities?.handlesAgentConsult === true;
   params.logger.info(
     formatMeetingRealtimeVoiceModelLog({
       logScope: params.platform.logScope,
@@ -417,7 +421,7 @@ export async function startMeetingRealtimeEngine(params: {
         `${params.platform.sessionIdPrefix}:${params.meetingSessionId}:command-realtime`,
       mode: "realtime",
       transport: "gateway-relay",
-      brain: strategy === "bidi" ? "direct-tools" : "agent-consult",
+      brain: providerBrain,
       provider: resolved.provider.id,
     },
     talkPayloads: {
@@ -487,6 +491,7 @@ export async function startMeetingRealtimeEngine(params: {
       provider: resolved.provider,
       cfg: params.fullConfig,
       agentId: params.config.realtime.agentId,
+      sessionKey: params.requesterSessionKey,
       providerConfig: resolved.providerConfig,
       audioFormat: resolveMeetingRealtimeAudioFormat(params.config.chrome.audioFormat),
       instructions: params.config.realtime.instructions,
@@ -550,7 +555,7 @@ export async function startMeetingRealtimeEngine(params: {
               text,
             ),
           );
-          if (role === "user" && strategy === "agent") {
+          if (role === "user" && strategy === "agent" && !providerHandlesAgentTurns) {
             if (harness.isLikelyAssistantEchoTranscript(text)) {
               params.logger.info(
                 formatMeetingTranscriptSummaryLog(
@@ -562,7 +567,7 @@ export async function startMeetingRealtimeEngine(params: {
               return;
             }
           }
-          if (role === "user" && strategy === "agent") {
+          if (role === "user" && strategy === "agent" && !providerHandlesAgentTurns) {
             harness.talkback?.enqueue(text);
           }
         }

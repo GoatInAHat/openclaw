@@ -17,8 +17,6 @@ import type {
 const INTERNAL_REALTIME_VOICE_PROVIDER = Symbol.for("openclaw.internal.realtime-voice-provider.v1");
 
 export type InternalRealtimeVoiceProviderCapabilities = RealtimeVoiceProviderCapabilities & {
-  /** The provider owns agent delegation instead of exposing client-side function tools. */
-  handlesAgentConsult?: boolean;
   /** The provider can keep browser media direct while exposing its control wire to Gateway. */
   supportsGatewayControl?: boolean;
 };

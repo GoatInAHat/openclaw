@@ -2,7 +2,7 @@
 import { isRecord } from "@openclaw/normalization-core/record-coerce";
 import { normalizeOptionalString } from "@openclaw/normalization-core/string-coerce";
 import type { OpenClawConfig } from "../config/types.openclaw.js";
-import type { TalkTransport } from "./talk-events.js";
+import type { TalkBrain, TalkTransport } from "./talk-events.js";
 
 export type RealtimeVoiceProviderId = string;
 
@@ -67,6 +67,13 @@ export type RealtimeVoiceBridgeEvent = {
   detail?: string;
   itemId?: string;
   responseId?: string;
+};
+
+/** Agent progress emitted by a provider-native realtime session. */
+export type RealtimeVoiceAgentEvent = {
+  stream: string;
+  data: Record<string, unknown>;
+  sessionKey?: string;
 };
 
 export type RealtimeVoiceResponseError = {
@@ -151,6 +158,7 @@ export type RealtimeVoiceBridgeCallbacks = {
   onClearAudio: (reason?: RealtimeVoiceAudioClearReason) => void;
   onMark?: (markName: string) => void;
   onTranscript?: (role: RealtimeVoiceRole, text: string, isFinal: boolean) => void;
+  onAgentEvent?: (event: RealtimeVoiceAgentEvent) => void | Promise<void>;
   onEvent?: (event: RealtimeVoiceBridgeEvent) => void;
   onResponseDone?: (outcome: RealtimeVoiceResponseOutcome) => void;
   onToolCall?: (event: RealtimeVoiceToolCallEvent) => void;
@@ -163,6 +171,10 @@ export type RealtimeVoiceProviderConfig = Record<string, unknown>;
 
 export type RealtimeVoiceProviderCapabilities = {
   transports: TalkTransport[];
+  /** Brain strategy this provider exposes to Talk consumers. */
+  brain?: TalkBrain;
+  /** The provider owns agent delegation instead of exposing host-side consult tools. */
+  handlesAgentConsult?: boolean;
   inputAudioFormats: RealtimeVoiceAudioFormat[];
   outputAudioFormats: RealtimeVoiceAudioFormat[];
   supportsBrowserSession?: boolean;
@@ -197,6 +209,8 @@ export type RealtimeVoiceBridgeCreateRequest = RealtimeVoiceBridgeCallbacks & {
   cfg?: OpenClawConfig;
   /** Host-selected agent scope for provider auth and agent-owned bridge state. */
   agentId?: string;
+  /** Existing OpenClaw session continued by a provider-owned native agent run. */
+  sessionKey?: string;
   providerConfig: RealtimeVoiceProviderConfig;
   audioFormat?: RealtimeVoiceAudioFormat;
   instructions?: string;
