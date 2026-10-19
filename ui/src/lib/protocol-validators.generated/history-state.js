@@ -527,6 +527,9 @@ var isChatHistoryState = /* @__PURE__ */ (() => {
           (value.sessionInfo.pinned === void 0 ||
             !("pinned" in value.sessionInfo) ||
             typeof value.sessionInfo.pinned == "boolean") &&
+          (value.sessionInfo.maintenanceProtected === void 0 ||
+            !("maintenanceProtected" in value.sessionInfo) ||
+            typeof value.sessionInfo.maintenanceProtected == "boolean") &&
           (value.sessionInfo.sidebarRoot === void 0 ||
             !("sidebarRoot" in value.sessionInfo) ||
             typeof value.sessionInfo.sidebarRoot == "boolean") &&

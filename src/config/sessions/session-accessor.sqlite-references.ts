@@ -1,8 +1,6 @@
 import { uniqueStrings } from "@openclaw/normalization-core/string-normalization";
-import { sql } from "kysely";
-import { jsonValid } from "../../infra/database-engine/json-values.js";
+import { jsonBooleanIsTrue } from "../../infra/database-engine/json-values.js";
 import { iterateSqliteQuerySync, sqliteStringSet } from "../../infra/kysely-sync.js";
-import { isPostgresSqlConnection } from "../../infra/sql-connection.js";
 import type { OpenClawAgentDatabase } from "../../state/openclaw-agent-db.js";
 import { readLegacyCompactionHistory } from "./legacy-compaction-history.js";
 import { getSessionKysely } from "./session-accessor.sqlite-scope-helpers.js";
@@ -41,10 +39,6 @@ export function addRetainedWindowSessionReferences(
   diskBudget?: { preserveRecentMs?: number | null },
 ): void {
   const db = getSessionKysely(database.db);
-  const entryJson = /* kysely-allow-raw: This expression names a fixed schema column, never caller input. */ sql<string>`session_nodes.entry_json`;
-  const maintenanceProtected = isPostgresSqlConnection(database.db)
-    ? /* kysely-allow-raw: Keep opaque JSON strings valid without jsonb conversion; match only JSON true. */ sql<boolean>`CASE WHEN ${jsonValid(database.db, entryJson)} THEN json_extract_path(${entryJson}::json, 'maintenanceProtected')::text = 'true' ELSE false END`
-    : /* kysely-allow-raw: Match the canonical boolean without decoding complete owner entries. */ sql<boolean>`CASE WHEN json_valid(session_nodes.entry_json) THEN json_type(session_nodes.entry_json, '$.maintenanceProtected') = 'true' ELSE 0 END`;
   // Explicit reset/delete excludes its target owner. Automatic deletion rechecks
   // window ownership inside the commit after archive materialization has awaited.
   let query = db
@@ -62,7 +56,7 @@ export function addRetainedWindowSessionReferences(
       eb.or([
         eb("session_nodes.archived_at", "is not", null),
         eb("session_nodes.pinned_at", "is not", null),
-        maintenanceProtected,
+        jsonBooleanIsTrue(database.db, eb.ref("session_nodes.entry_json"), "maintenanceProtected"),
       ]),
     );
   if (candidateSessionIds) {
