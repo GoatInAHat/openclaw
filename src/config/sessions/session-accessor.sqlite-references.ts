@@ -41,7 +41,7 @@ export function addRetainedWindowSessionReferences(
   diskBudget?: { preserveRecentMs?: number | null },
 ): void {
   const db = getSessionKysely(database.db);
-  const entryJson = sql.ref("session_nodes.entry_json");
+  const entryJson = /* kysely-allow-raw: This expression names a fixed schema column, never caller input. */ sql<string>`session_nodes.entry_json`;
   const maintenanceProtected = isPostgresSqlConnection(database.db)
     ? /* kysely-allow-raw: Keep opaque JSON strings valid without jsonb conversion; match only JSON true. */ sql<boolean>`CASE WHEN ${jsonValid(database.db, entryJson)} THEN json_extract_path(${entryJson}::json, 'maintenanceProtected')::text = 'true' ELSE false END`
     : /* kysely-allow-raw: Match the canonical boolean without decoding complete owner entries. */ sql<boolean>`CASE WHEN json_valid(session_nodes.entry_json) THEN json_type(session_nodes.entry_json, '$.maintenanceProtected') = 'true' ELSE 0 END`;
