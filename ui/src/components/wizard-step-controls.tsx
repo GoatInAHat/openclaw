@@ -35,8 +35,8 @@ function stepClass(props: WizardStepControlsProps, name: string) {
   return `${props.presentation === "channels" ? "channels-wizard" : "wizard-step"}__${name}`;
 }
 
-export function WizardBusyButton(props: { statusLabel: string; buttonLabel?: string }) {
-  const label = () => props.buttonLabel ?? t("modelSetup.wizard.continue");
+export function WizardBusyButton(props: { statusLabel: string }) {
+  const label = () => t("modelSetup.wizard.continue");
   return (
     <button type="button" class="btn primary" disabled aria-busy="true" aria-label={label()}>
       <span class="btn__label">{label()}</span>
@@ -121,15 +121,20 @@ function SignIn(props: Pick<WizardStepControlsProps, "step" | "presentation" | "
             </a>
           </Show>
           <Show when={copyValue()} keyed>
-            {(value) => (
-              <button
-                type="button"
-                class="btn"
-                onClick={(event) => void handleCopyButton(event, value, copyLabel())}
-              >
-                <span data-copy-label>{copyLabel()}</span>
-              </button>
-            )}
+            {(value) => {
+              let label!: HTMLSpanElement;
+              return (
+                <button
+                  type="button"
+                  class="btn"
+                  onClick={(event) => void handleCopyButton(event, value, copyLabel(), { label })}
+                >
+                  <span ref={(element) => (label = element)} data-copy-label>
+                    {copyLabel()}
+                  </span>
+                </button>
+              );
+            }}
           </Show>
         </div>
         <div
