@@ -115,6 +115,6 @@ it("matches only literal JSON true without rejecting opaque unrelated values", (
       db,
       query.selectNoFrom(jsonBooleanIsTrue(db, sql.val(json), "flag").as("matches")),
     ).rows[0]!;
-    expect(Boolean(result.matches), json ?? "SQL NULL").toBe(expected);
+    expect(result.matches, json ?? "SQL NULL").toBeOneOf(expected ? [1] : [0, null]);
   }
 });

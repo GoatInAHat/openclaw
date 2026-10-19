@@ -37,11 +37,6 @@ function CodePointCount(value) {
   return result;
 }
 
-// node_modules/.pnpm/typebox@1.3.36/node_modules/typebox/build/guard/guard.mjs
-function CodePointCount2(value) {
-  return CodePointCount(value);
-}
-
 // <stdin>
 var isAgentRuntimeRestrictionErrorDetails = /* @__PURE__ */ (() => {
     let External = [
@@ -66,10 +61,10 @@ var isAgentRuntimeRestrictionErrorDetails = /* @__PURE__ */ (() => {
         value.code === "AGENT_RUNTIME_RESTRICTED" &&
         typeof value.runtimeId == "string" &&
         (value.runtimeId.length >= 2 ||
-          (value.runtimeId.length >= 1 && CodePointCount2(value.runtimeId) >= 1)) &&
+          (value.runtimeId.length >= 1 && CodePointCount(value.runtimeId) >= 1)) &&
         typeof value.runtimeLabel == "string" &&
         (value.runtimeLabel.length >= 2 ||
-          (value.runtimeLabel.length >= 1 && CodePointCount2(value.runtimeLabel) >= 1)) &&
+          (value.runtimeLabel.length >= 1 && CodePointCount(value.runtimeLabel) >= 1)) &&
         ((typeof value.reason == "string" && value.reason === "sandbox-required") ||
           (typeof value.reason == "string" && value.reason === "sandbox") ||
           (typeof value.reason == "string" && value.reason === "workspace-only") ||
@@ -94,13 +89,13 @@ var isAgentRuntimeRestrictionErrorDetails = /* @__PURE__ */ (() => {
             typeof value.recovery.sessionId == "string" &&
             (value.recovery.sessionId.length >= 2 ||
               (value.recovery.sessionId.length >= 1 &&
-                CodePointCount2(value.recovery.sessionId) >= 1)) &&
+                CodePointCount(value.recovery.sessionId) >= 1)) &&
             (value.recovery.lifecycleRevision === void 0 ||
               !("lifecycleRevision" in value.recovery) ||
               (typeof value.recovery.lifecycleRevision == "string" &&
                 (value.recovery.lifecycleRevision.length >= 2 ||
                   (value.recovery.lifecycleRevision.length >= 1 &&
-                    CodePointCount2(value.recovery.lifecycleRevision) >= 1)))) &&
+                    CodePointCount(value.recovery.lifecycleRevision) >= 1)))) &&
             ((typeof value.recovery.expectedPermissionMode == "string" &&
               value.recovery.expectedPermissionMode === "read-only") ||
               (typeof value.recovery.expectedPermissionMode == "string" &&
@@ -116,7 +111,7 @@ var isAgentRuntimeRestrictionErrorDetails = /* @__PURE__ */ (() => {
             ((typeof value.recovery.expectedNativeRuntimeConsent == "string" &&
               (value.recovery.expectedNativeRuntimeConsent.length >= 2 ||
                 (value.recovery.expectedNativeRuntimeConsent.length >= 1 &&
-                  CodePointCount2(value.recovery.expectedNativeRuntimeConsent) >= 1))) ||
+                  CodePointCount(value.recovery.expectedNativeRuntimeConsent) >= 1))) ||
               value.recovery.expectedNativeRuntimeConsent === null)));
     return (value) => check_0(value);
   })(),
@@ -146,25 +141,25 @@ var isAgentRuntimeRestrictionErrorDetails = /* @__PURE__ */ (() => {
           ) &&
           typeof value.sessionKey == "string" &&
           (value.sessionKey.length >= 2 ||
-            (value.sessionKey.length >= 1 && CodePointCount2(value.sessionKey) >= 1)) &&
+            (value.sessionKey.length >= 1 && CodePointCount(value.sessionKey) >= 1)) &&
           (value.agentId === void 0 ||
             !("agentId" in value) ||
             (typeof value.agentId == "string" &&
               (value.agentId.length >= 2 ||
-                (value.agentId.length >= 1 && CodePointCount2(value.agentId) >= 1)))) &&
+                (value.agentId.length >= 1 && CodePointCount(value.agentId) >= 1)))) &&
           (value.sessionId === void 0 ||
             !("sessionId" in value) ||
             (typeof value.sessionId == "string" &&
               (value.sessionId.length >= 2 ||
-                (value.sessionId.length >= 1 && CodePointCount2(value.sessionId) >= 1)))) &&
+                (value.sessionId.length >= 1 && CodePointCount(value.sessionId) >= 1)))) &&
           typeof value.goalId == "string" &&
           (value.goalId.length >= 2 ||
-            (value.goalId.length >= 1 && CodePointCount2(value.goalId) >= 1)) &&
+            (value.goalId.length >= 1 && CodePointCount(value.goalId) >= 1)) &&
           typeof value.operationId == "string" &&
           (value.operationId.length >= 2 ||
-            (value.operationId.length >= 1 && CodePointCount2(value.operationId) >= 1)) &&
+            (value.operationId.length >= 1 && CodePointCount(value.operationId) >= 1)) &&
           (value.operationId.length <= 128 ||
-            (value.operationId.length <= 256 && CodePointCount2(value.operationId) <= 128)) &&
+            (value.operationId.length <= 256 && CodePointCount(value.operationId) <= 128)) &&
           Number.isInteger(value.issuedAtMs) &&
           (!(Number.isFinite(value.issuedAtMs) || typeof value.issuedAtMs == "bigint") ||
             value.issuedAtMs >= 0) &&
@@ -172,9 +167,9 @@ var isAgentRuntimeRestrictionErrorDetails = /* @__PURE__ */ (() => {
           value.action === "edit" &&
           typeof value.objective == "string" &&
           (value.objective.length >= 2 ||
-            (value.objective.length >= 1 && CodePointCount2(value.objective) >= 1)) &&
+            (value.objective.length >= 1 && CodePointCount(value.objective) >= 1)) &&
           (value.objective.length <= 16e3 ||
-            (value.objective.length <= 32e3 && CodePointCount2(value.objective) <= 16e3))) ||
+            (value.objective.length <= 32e3 && CodePointCount(value.objective) <= 16e3))) ||
         (typeof value == "object" &&
           value !== null &&
           !Array.isArray(value) &&
@@ -188,25 +183,25 @@ var isAgentRuntimeRestrictionErrorDetails = /* @__PURE__ */ (() => {
           ) &&
           typeof value.sessionKey == "string" &&
           (value.sessionKey.length >= 2 ||
-            (value.sessionKey.length >= 1 && CodePointCount2(value.sessionKey) >= 1)) &&
+            (value.sessionKey.length >= 1 && CodePointCount(value.sessionKey) >= 1)) &&
           (value.agentId === void 0 ||
             !("agentId" in value) ||
             (typeof value.agentId == "string" &&
               (value.agentId.length >= 2 ||
-                (value.agentId.length >= 1 && CodePointCount2(value.agentId) >= 1)))) &&
+                (value.agentId.length >= 1 && CodePointCount(value.agentId) >= 1)))) &&
           (value.sessionId === void 0 ||
             !("sessionId" in value) ||
             (typeof value.sessionId == "string" &&
               (value.sessionId.length >= 2 ||
-                (value.sessionId.length >= 1 && CodePointCount2(value.sessionId) >= 1)))) &&
+                (value.sessionId.length >= 1 && CodePointCount(value.sessionId) >= 1)))) &&
           typeof value.goalId == "string" &&
           (value.goalId.length >= 2 ||
-            (value.goalId.length >= 1 && CodePointCount2(value.goalId) >= 1)) &&
+            (value.goalId.length >= 1 && CodePointCount(value.goalId) >= 1)) &&
           typeof value.operationId == "string" &&
           (value.operationId.length >= 2 ||
-            (value.operationId.length >= 1 && CodePointCount2(value.operationId) >= 1)) &&
+            (value.operationId.length >= 1 && CodePointCount(value.operationId) >= 1)) &&
           (value.operationId.length <= 128 ||
-            (value.operationId.length <= 256 && CodePointCount2(value.operationId) <= 128)) &&
+            (value.operationId.length <= 256 && CodePointCount(value.operationId) <= 128)) &&
           Number.isInteger(value.issuedAtMs) &&
           (!(Number.isFinite(value.issuedAtMs) || typeof value.issuedAtMs == "bigint") ||
             value.issuedAtMs >= 0) &&
@@ -218,7 +213,7 @@ var isAgentRuntimeRestrictionErrorDetails = /* @__PURE__ */ (() => {
             !("note" in value) ||
             (typeof value.note == "string" &&
               (value.note.length <= 2e3 ||
-                (value.note.length <= 4e3 && CodePointCount2(value.note) <= 2e3)))));
+                (value.note.length <= 4e3 && CodePointCount(value.note) <= 2e3)))));
     return (value) => check_0(value);
   })(),
   isSessionsGoalClearParams = /* @__PURE__ */ (() => {
@@ -238,25 +233,25 @@ var isAgentRuntimeRestrictionErrorDetails = /* @__PURE__ */ (() => {
         ) &&
         typeof value.sessionKey == "string" &&
         (value.sessionKey.length >= 2 ||
-          (value.sessionKey.length >= 1 && CodePointCount2(value.sessionKey) >= 1)) &&
+          (value.sessionKey.length >= 1 && CodePointCount(value.sessionKey) >= 1)) &&
         (value.agentId === void 0 ||
           !("agentId" in value) ||
           (typeof value.agentId == "string" &&
             (value.agentId.length >= 2 ||
-              (value.agentId.length >= 1 && CodePointCount2(value.agentId) >= 1)))) &&
+              (value.agentId.length >= 1 && CodePointCount(value.agentId) >= 1)))) &&
         (value.sessionId === void 0 ||
           !("sessionId" in value) ||
           (typeof value.sessionId == "string" &&
             (value.sessionId.length >= 2 ||
-              (value.sessionId.length >= 1 && CodePointCount2(value.sessionId) >= 1)))) &&
+              (value.sessionId.length >= 1 && CodePointCount(value.sessionId) >= 1)))) &&
         typeof value.goalId == "string" &&
         (value.goalId.length >= 2 ||
-          (value.goalId.length >= 1 && CodePointCount2(value.goalId) >= 1)) &&
+          (value.goalId.length >= 1 && CodePointCount(value.goalId) >= 1)) &&
         typeof value.operationId == "string" &&
         (value.operationId.length >= 2 ||
-          (value.operationId.length >= 1 && CodePointCount2(value.operationId) >= 1)) &&
+          (value.operationId.length >= 1 && CodePointCount(value.operationId) >= 1)) &&
         (value.operationId.length <= 128 ||
-          (value.operationId.length <= 256 && CodePointCount2(value.operationId) <= 128)) &&
+          (value.operationId.length <= 256 && CodePointCount(value.operationId) <= 128)) &&
         Number.isInteger(value.issuedAtMs) &&
         (!(Number.isFinite(value.issuedAtMs) || typeof value.issuedAtMs == "bigint") ||
           value.issuedAtMs >= 0);
@@ -278,11 +273,11 @@ var isAgentRuntimeRestrictionErrorDetails = /* @__PURE__ */ (() => {
         Object.getOwnPropertyNames(value).length === 2 &&
         typeof value.deviceId == "string" &&
         (value.deviceId.length >= 2 ||
-          (value.deviceId.length >= 1 && CodePointCount2(value.deviceId) >= 1)) &&
+          (value.deviceId.length >= 1 && CodePointCount(value.deviceId) >= 1)) &&
         typeof value.path == "string" &&
-        (value.path.length >= 2 || (value.path.length >= 1 && CodePointCount2(value.path) >= 1)) &&
+        (value.path.length >= 2 || (value.path.length >= 1 && CodePointCount(value.path) >= 1)) &&
         (value.path.length <= 4096 ||
-          (value.path.length <= 8192 && CodePointCount2(value.path) <= 4096));
+          (value.path.length <= 8192 && CodePointCount(value.path) <= 4096));
     return (value) => check_0(value);
   })(),
   isSessionRepository = /* @__PURE__ */ (() => {
@@ -296,15 +291,15 @@ var isAgentRuntimeRestrictionErrorDetails = /* @__PURE__ */ (() => {
           (var_160, var_161) => External[0].test(var_160) || !1,
         ) &&
         typeof value.url == "string" &&
-        (value.url.length >= 2 || (value.url.length >= 1 && CodePointCount2(value.url) >= 1)) &&
+        (value.url.length >= 2 || (value.url.length >= 1 && CodePointCount(value.url) >= 1)) &&
         (value.url.length <= 2048 ||
-          (value.url.length <= 4096 && CodePointCount2(value.url) <= 2048)) &&
+          (value.url.length <= 4096 && CodePointCount(value.url) <= 2048)) &&
         (value.ref === void 0 ||
           !("ref" in value) ||
           (typeof value.ref == "string" &&
-            (value.ref.length >= 2 || (value.ref.length >= 1 && CodePointCount2(value.ref) >= 1)) &&
+            (value.ref.length >= 2 || (value.ref.length >= 1 && CodePointCount(value.ref) >= 1)) &&
             (value.ref.length <= 1024 ||
-              (value.ref.length <= 2048 && CodePointCount2(value.ref) <= 1024))));
+              (value.ref.length <= 2048 && CodePointCount(value.ref) <= 1024))));
     return (value) => check_0(value);
   })(),
   isSessionFastMode = /* @__PURE__ */ (() => {
@@ -319,7 +314,7 @@ var isAgentRuntimeRestrictionErrorDetails = /* @__PURE__ */ (() => {
     let External = [],
       check_0 = (value) =>
         typeof value == "string" &&
-        (value.length <= 1e3 || (value.length <= 2e3 && CodePointCount2(value) <= 1e3));
+        (value.length <= 1e3 || (value.length <= 2e3 && CodePointCount(value) <= 1e3));
     return (value) => check_0(value);
   })(),
   isSessionPermissionMode = /* @__PURE__ */ (() => {
@@ -366,7 +361,7 @@ var isAgentRuntimeRestrictionErrorDetails = /* @__PURE__ */ (() => {
                     (element, index) =>
                       typeof element == "string" &&
                       (element.length >= 2 ||
-                        (element.length >= 1 && CodePointCount2(element) >= 1)),
+                        (element.length >= 1 && CodePointCount(element) >= 1)),
                   )),
             ))) &&
         (value.skills === void 0 ||
@@ -396,16 +391,16 @@ var isAgentRuntimeRestrictionErrorDetails = /* @__PURE__ */ (() => {
         Object.getOwnPropertyNames(value).length === 5 &&
         typeof value.changeId == "string" &&
         (value.changeId.length >= 2 ||
-          (value.changeId.length >= 1 && CodePointCount2(value.changeId) >= 1)) &&
+          (value.changeId.length >= 1 && CodePointCount(value.changeId) >= 1)) &&
         typeof value.voiceSessionId == "string" &&
         (value.voiceSessionId.length >= 2 ||
-          (value.voiceSessionId.length >= 1 && CodePointCount2(value.voiceSessionId) >= 1)) &&
+          (value.voiceSessionId.length >= 1 && CodePointCount(value.voiceSessionId) >= 1)) &&
         typeof value.sessionKey == "string" &&
         (value.sessionKey.length >= 2 ||
-          (value.sessionKey.length >= 1 && CodePointCount2(value.sessionKey) >= 1)) &&
+          (value.sessionKey.length >= 1 && CodePointCount(value.sessionKey) >= 1)) &&
         typeof value.voice == "string" &&
         (value.voice.length >= 2 ||
-          (value.voice.length >= 1 && CodePointCount2(value.voice) >= 1)) &&
+          (value.voice.length >= 1 && CodePointCount(value.voice) >= 1)) &&
         ((typeof value.phase == "string" && value.phase === "requested") ||
           (typeof value.phase == "string" && value.phase === "cancelled"));
     return (value) => check_0(value);

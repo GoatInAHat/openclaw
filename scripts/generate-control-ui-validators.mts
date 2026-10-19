@@ -258,7 +258,7 @@ async function main() {
     const source = [
       ...(compiled.includes("Guard.")
         ? [
-            `import { CodePointCount } from ${JSON.stringify(path.join(typeboxBuildRoot, "guard/guard.mjs"))};`,
+            `import { CodePointCount } from ${JSON.stringify(path.join(typeboxBuildRoot, "guard/unicode/unicode.mjs"))};`,
           ]
         : []),
       ...(compiled.includes("Hashing.")
